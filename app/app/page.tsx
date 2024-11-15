@@ -577,10 +577,20 @@ const Page = () => {
                                             onClick={() => setSelectedLayer(textSet.id)}
                                         >
                                             <div className="flex items-center gap-2">
-                                                <div className="w-12 h-12 rounded-md bg-accent/50 flex items-center justify-center">
+                                                <div 
+                                                    className="w-12 h-12 rounded-md bg-accent/50 flex items-center justify-center"
+                                                    role="presentation"
+                                                >
                                                     <span className="text-xs">Text {index + 1}</span>
                                                 </div>
-                                                <span className="text-sm truncate">{textSet.text}</span>
+                                                <div className="flex flex-col flex-1 min-w-0">
+                                                    <span className="text-sm truncate">{textSet.text}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {textSet.fontFamily}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
