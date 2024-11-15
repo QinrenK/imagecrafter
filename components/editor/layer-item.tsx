@@ -1,6 +1,6 @@
 import { Button } from "../ui/button";
 import { Slider } from "../ui/slider";
-import { EyeOpenIcon, EyeClosedIcon, ChevronUpIcon, ChevronDownIcon } from "@radix-ui/react-icons";
+import { EyeOpenIcon, EyeClosedIcon } from "@radix-ui/react-icons";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { ImageLayer } from "@/types/editor";
@@ -8,23 +8,17 @@ import { ImageLayer } from "@/types/editor";
 interface LayerItemProps {
   layer: ImageLayer;
   isSelected: boolean;
-  isFirst: boolean;
-  isLast: boolean;
   onSelect: (id: string) => void;
   onVisibilityToggle: (id: string) => void;
   onOpacityChange: (id: string, opacity: number) => void;
-  onMoveLayer: (id: string, direction: 'up' | 'down') => void;
 }
 
 const LayerItem = ({
   layer,
   isSelected,
-  isFirst,
-  isLast,
   onSelect,
   onVisibilityToggle,
   onOpacityChange,
-  onMoveLayer,
 }: LayerItemProps) => {
   return (
     <div
@@ -35,33 +29,6 @@ const LayerItem = ({
       onClick={() => onSelect(layer.id)}
     >
       <div className="flex items-center gap-2">
-        <div className="flex flex-col">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-4 w-4"
-            disabled={isFirst}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveLayer(layer.id, 'up');
-            }}
-          >
-            <ChevronUpIcon className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-4 w-4"
-            disabled={isLast}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveLayer(layer.id, 'down');
-            }}
-          >
-            <ChevronDownIcon className="h-3 w-3" />
-          </Button>
-        </div>
-
         <div className="w-12 h-12 rounded-md overflow-hidden">
           <Image
             src={layer.imageUrl}

@@ -1,7 +1,7 @@
 // app/app/page.tsx
 'use client'
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useUser } from '@/hooks/useUser';
 import { useSessionContext } from '@supabase/auth-helpers-react';
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
@@ -22,6 +22,7 @@ import { Slider } from "@/components/ui/slider";
 import { IntegratedPanel } from '@/components/editor/integrated-panel';
 import { ResizableImage } from '@/components/editor/resizable-image';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent } from "@/components/ui/dropdown-menu"
+import { LayerItem } from "@/components/editor/layer-item";
 
 interface TextSet {
     id: string;
@@ -80,6 +81,22 @@ const Page = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [initialDimensions, setInitialDimensions] = useState<{ width: number; height: number } | null>(null);
     const [layerHistory, setLayerHistory] = useState<string[]>([]);
+    const [canvasDimensions, setCanvasDimensions] = useState({ width: 800, height: 600 });
+
+    useEffect(() => {
+        const updateDimensions = () => {
+            setCanvasDimensions({
+                width: window.innerWidth * 0.6,
+                height: window.innerHeight * 0.6
+            });
+        };
+
+        updateDimensions();
+
+        window.addEventListener('resize', updateDimensions);
+
+        return () => window.removeEventListener('resize', updateDimensions);
+    }, []);
 
     const handleUploadImage = () => {
         if (fileInputRef.current) {
@@ -474,97 +491,15 @@ const Page = () => {
                             <Card className="p-4">
                                 <h3 className="text-sm font-medium mb-2">Layers</h3>
                                 <ScrollArea className="h-[calc(100vh-12rem)]">
-                                    {layers.images.map((layer, index) => (
-                                        <div 
+                                    {layers.images.map((layer) => (
+                                        <LayerItem
                                             key={layer.id}
-                                            className={cn(
-                                                "p-2 rounded-md cursor-pointer hover:bg-accent mb-2",
-                                                selectedLayer === layer.id && "bg-accent"
-                                            )}
-                                            onClick={() => setSelectedLayer(layer.id)}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex flex-col">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6"
-                                                        disabled={index === 0}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            moveLayer(layer.id, 'up');
-                                                        }}
-                                                    >
-                                                        <ChevronUpIcon className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6"
-                                                        disabled={index === layers.images.length - 1}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            moveLayer(layer.id, 'down');
-                                                        }}
-                                                    >
-                                                        <ChevronDownIcon className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                                <div className="relative w-12 h-12 rounded-md overflow-hidden">
-                                                    <ResizableImage
-                                                        src={layer.imageUrl}
-                                                        alt={layer.name}
-                                                        isSelected={selectedLayer === layer.id}
-                                                        opacity={layer.opacity}
-                                                        type={layer.type}
-                                                        size={layer.size}
-                                                        rotation={layer.rotation}
-                                                        onResize={(size) => handleImageUpdate(layer.id, { size })}
-                                                        onRotate={(rotation) => handleImageUpdate(layer.id, { rotation })}
-                                                        onSelect={() => handleLayerSelect(layer.id)}
-                                                        zIndex={selectedLayer === layer.id ? 
-                                                            layers.images.length + 1 : 
-                                                            layers.images.length - index}
-                                                    />
-                                                    {!layer.isVisible && (
-                                                        <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                                                            <EyeClosedIcon className="w-4 h-4" />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="flex flex-col flex-1 min-w-0">
-                                                    <span className="text-sm truncate">
-                                                        {layer.name}
-                                                    </span>
-                                                    <div className="flex items-center gap-2">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-6 w-6"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                toggleLayerVisibility(layer.id);
-                                                            }}
-                                                        >
-                                                            {layer.isVisible ? (
-                                                                <EyeOpenIcon className="w-4 h-4" />
-                                                            ) : (
-                                                                <EyeClosedIcon className="w-4 h-4" />
-                                                            )}
-                                                        </Button>
-                                                        <Slider 
-                                                            className="w-20"
-                                                            value={[layer.opacity * 100]}
-                                                            onValueChange={([value]) => {
-                                                                updateLayerOpacity(layer.id, value / 100);
-                                                            }}
-                                                            max={100}
-                                                            step={1}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                            layer={layer}
+                                            isSelected={selectedLayer === layer.id}
+                                            onSelect={handleLayerSelect}
+                                            onVisibilityToggle={toggleLayerVisibility}
+                                            onOpacityChange={updateLayerOpacity}
+                                        />
                                     ))}
 
                                     {textSets.map((textSet, index) => (
@@ -728,8 +663,8 @@ const Page = () => {
                 style={{ display: 'none' }}
                 aria-hidden="true"
                 className="absolute"
-                width={window.innerWidth * 0.6}
-                height={window.innerHeight * 0.6}
+                width={canvasDimensions.width}
+                height={canvasDimensions.height}
             />
         </>
     );
