@@ -15,6 +15,13 @@ export interface ImageLayer {
     x: number;
     y: number;
   };
+  crop: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    aspect?: number;
+  };
 }
 
 export interface TextSet {
@@ -25,8 +32,9 @@ export interface TextSet {
   color: string;
   opacity: number;
   rotation: number;
-  position?: {
+  position: {
     x: number;
     y: number;
   };
+  fontWeight: number;
 } 

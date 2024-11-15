@@ -26,14 +26,14 @@ interface TextSet {
     id: string;
     text: string;
     fontFamily: string;
-    top: number;
-    left: number;
+    position: {
+        x: number;
+        y: number;
+    };
     color: string;
     fontSize: number;
     fontWeight: number;
     opacity: number;
-    shadowColor: string;
-    shadowSize: number;
     rotation: number;
 }
 
@@ -48,6 +48,13 @@ interface ImageLayer {
   size: { width: number; height: number };
   rotation: number;
   position: { x: number; y: number };
+  crop: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    aspect?: number;
+  };
 }
 
 interface LayerState {
@@ -116,6 +123,12 @@ const Page = () => {
                     size: {
                         width: Math.round(newWidth),
                         height: Math.round(newHeight)
+                    },
+                    crop: {
+                        x: 0,
+                        y: 0,
+                        width: 100,
+                        height: 100
                     }
                 };
 
@@ -157,16 +170,16 @@ const Page = () => {
         const newId = `text-${Date.now()}`;
         setTextSets(prev => [...prev, {
             id: newId,
-            text: 'edit',
+            text: 'New Text',
             fontFamily: 'Inter',
-            top: 0,
-            left: 0,
+            position: {
+                x: 50,
+                y: 50
+            },
             color: 'white',
-            fontSize: 200,
-            fontWeight: 800,
+            fontSize: 32,
+            fontWeight: 400,
             opacity: 1,
-            shadowColor: 'rgba(0, 0, 0, 0.8)',
-            shadowSize: 4,
             rotation: 0
         }]);
     };
@@ -209,8 +222,8 @@ const Page = () => {
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
     
-                const x = canvas.width * (textSet.left + 50) / 100;
-                const y = canvas.height * (50 - textSet.top) / 100;
+                const x = canvas.width * (textSet.position.x + 50) / 100;
+                const y = canvas.height * (50 - textSet.position.y) / 100;
     
                 // Move the context to the text position and rotate
                 ctx.translate(x, y);
@@ -281,6 +294,19 @@ const Page = () => {
 
     const handleLayerSelect = (layerId: string) => {
         setSelectedLayer(layerId);
+        
+        // Determine if the selected layer is an image or text
+        const isImage = layers.images.some(img => img.id === layerId);
+        const isText = textSets.some(text => text.id === layerId);
+        
+        // Update the integrated panel's active tab based on selection
+        if (isImage) {
+            const panel = document.querySelector('[value="transform"]') as HTMLButtonElement;
+            if (panel) panel.click();
+        } else if (isText) {
+            const panel = document.querySelector('[value="text"]') as HTMLButtonElement;
+            if (panel) panel.click();
+        }
     };
 
     const handleTextUpdate = (textId: string, updates: Partial<TextSet>) => {
@@ -450,32 +476,77 @@ const Page = () => {
                                                     transformOrigin: 'center',
                                                     zIndex: selectedLayer === layer.id ? 
                                                         layers.images.length + 1 : 
-                                                        layers.images.length - index
+                                                        layers.images.length - index,
+                                                    overflow: 'hidden'
                                                 }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleLayerSelect(layer.id);
                                                 }}
                                             >
-                                                <Image
-                                                    src={layer.imageUrl}
-                                                    alt={layer.name}
-                                                    width={layer.size.width}
-                                                    height={layer.size.height}
-                                                    className={cn(
-                                                        "transition-all duration-200",
-                                                        layer.type === 'removed-bg' && "mix-blend-normal"
-                                                    )}
-                                                    style={{ 
-                                                        opacity: layer.opacity,
-                                                        maxWidth: '100%',
-                                                        height: 'auto',
-                                                        objectFit: 'contain'
+                                                <div 
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        position: 'relative',
+                                                        overflow: 'hidden'
                                                     }}
-                                                    priority
-                                                />
+                                                >
+                                                    <Image
+                                                        src={layer.imageUrl}
+                                                        alt={layer.name}
+                                                        width={layer.size.width}
+                                                        height={layer.size.height}
+                                                        className={cn(
+                                                            "transition-all duration-200",
+                                                            layer.type === 'removed-bg' && "mix-blend-normal"
+                                                        )}
+                                                        style={{ 
+                                                            opacity: layer.opacity,
+                                                            maxWidth: 'none',
+                                                            width: `${100 * (100 / layer.crop.width)}%`,
+                                                            height: `${100 * (100 / layer.crop.height)}%`,
+                                                            objectFit: 'cover',
+                                                            position: 'absolute',
+                                                            left: `${-layer.crop.x * (100 / layer.crop.width)}%`,
+                                                            top: `${-layer.crop.y * (100 / layer.crop.height)}%`,
+                                                            transform: 'none'
+                                                        }}
+                                                        priority
+                                                    />
+                                                </div>
                                             </div>
                                         )
+                                    ))}
+
+                                    {textSets.map((textSet, index) => (
+                                        <div
+                                            key={textSet.id}
+                                            className={cn(
+                                                "absolute cursor-move",
+                                                selectedLayer === textSet.id && "ring-2 ring-primary ring-offset-2"
+                                            )}
+                                            style={{
+                                                position: 'absolute',
+                                                left: `${textSet.position?.x || 50}%`,
+                                                top: `${textSet.position?.y || 50}%`,
+                                                transform: `translate(-50%, -50%) rotate(${textSet.rotation}deg)`,
+                                                color: textSet.color,
+                                                fontFamily: textSet.fontFamily,
+                                                fontSize: `${textSet.fontSize}px`,
+                                                fontWeight: textSet.fontWeight,
+                                                opacity: textSet.opacity,
+                                                zIndex: selectedLayer === textSet.id ? 
+                                                    layers.images.length + textSets.length + 1 : 
+                                                    layers.images.length + index
+                                            }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleLayerSelect(textSet.id);
+                                            }}
+                                        >
+                                            {textSet.text}
+                                        </div>
                                     ))}
                                 </div>
                             </div>
@@ -490,6 +561,7 @@ const Page = () => {
                             onImageUpdate={handleImageUpdate}
                             onTextUpdate={handleTextUpdate}
                             onAddText={addNewTextSet}
+                            onFileChange={handleFileChange}
                         />
                     </div>
                 </div>
