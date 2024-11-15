@@ -19,11 +19,10 @@ const SkeletonOne = () => {
   return (
     <div>
       <p className="font-bold md:text-4xl text-xl text-white">
-        POV: A Moment Captured
+        ImageCrafter: Transform Your Photos
       </p>
-      <p className="font-normal text-base text-white"></p>
       <p className="font-normal text-base my-4 max-w-lg text-neutral-200">
-        Experience the beauty of the moment with this captivating view. The text behind the image effect enhances the scene, drawing you into the experience.
+        Create stunning designs with our powerful image editing tools
       </p>
     </div>
   );
@@ -33,11 +32,10 @@ const SkeletonTwo = () => {
   return (
     <div>
       <p className="font-bold md:text-4xl text-xl text-white">
-        Bear: Nature's Majesty
+        ImageCrafter: Creative Freedom
       </p>
-      <p className="font-normal text-base text-white"></p>
       <p className="font-normal text-base my-4 max-w-lg text-neutral-200">
-        Witness the grandeur of wildlife. The text behind the image effect adds depth, making the majestic bear even more striking.
+        Unleash your creativity with our intuitive design tools
       </p>
     </div>
   );

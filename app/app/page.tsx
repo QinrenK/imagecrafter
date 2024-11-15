@@ -16,7 +16,6 @@ import { Accordion } from '@/components/ui/accordion';
 import '@/app/fonts.css'
 import { ModeToggle } from '@/components/mode-toggle';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import PallyyAd from '@/ads/pallyy';
 
 const Page = () => {
     const { user } = useUser();
@@ -125,19 +124,23 @@ const Page = () => {
                 removedBgImg.crossOrigin = "anonymous";
                 removedBgImg.onload = () => {
                     ctx.drawImage(removedBgImg, 0, 0, canvas.width, canvas.height);
-                    triggerDownload();
+                    const timestamp = Date.now();
+                    triggerDownload(timestamp.toString());
                 };
                 removedBgImg.src = removedBgImageUrl;
             } else {
-                triggerDownload();
+                const timestamp = Date.now();
+                triggerDownload(timestamp.toString());
             }
         };
         bgImg.src = selectedImage || '';
     
-        function triggerDownload() {
-            const dataUrl = canvas.toDataURL('image/png');
+        function triggerDownload(imageSetId: string) {
+            if (!canvasRef.current) return;
+            
+            const dataUrl = canvasRef.current.toDataURL('image/webp', 0.8);
             const link = document.createElement('a');
-            link.download = 'text-behind-image.png';
+            link.download = `imagecrafter-${imageSetId}.webp`;
             link.href = dataUrl;
             link.click();
         }
@@ -147,12 +150,9 @@ const Page = () => {
         <>
             {user && session && session.user ? (
                 <div className='flex flex-col h-screen'>
-                    <div className="ml-6">
-                        <PallyyAd />
-                    </div>
                     <header className='flex flex-row items-center justify-between p-5 px-10'>
                         <h2 className="text-[12px] md:text-2xl font-semibold tracking-tight">
-                            Text behind image editor
+                            ImageCrafter Editor
                         </h2>
                         <div className='flex gap-4'>
                             <input
@@ -160,7 +160,7 @@ const Page = () => {
                                 ref={fileInputRef}
                                 style={{ display: 'none' }}
                                 onChange={handleFileChange}
-                                accept=".jpg, .jpeg, .png" // Updated to accept only jpg and png
+                                accept=".jpg, .jpeg, .png"
                             />
                             <Button onClick={handleUploadImage}>
                                 Upload image
@@ -241,7 +241,10 @@ const Page = () => {
                         </div>
                     ) : (
                         <div className='flex items-center justify-center min-h-screen w-full'>
-                            <h2 className="text-xl font-semibold">Welcome, get started by uploading an image!</h2>
+                            <h2 className="text-xl font-semibold">Welcome to ImageCrafter</h2>
+                            <p className="text-muted-foreground">
+                                Upload an image to start creating your design
+                            </p>
                         </div>
                     )}
                 </div>

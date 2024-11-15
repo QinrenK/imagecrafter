@@ -1,4 +1,15 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ImageCrafter
+
+A powerful image editing tool that allows you to create stunning designs by combining text and images. Built with Next.js 14 and modern web technologies.
+
+## Features
+
+- Multiple image upload support
+- Background removal
+- Text customization
+- Resolution control
+- Export in multiple formats
+...
 
 ## Getting Started
 
