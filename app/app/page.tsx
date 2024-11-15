@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import Authenticate from '@/components/authenticate';
 import { Button } from '@/components/ui/button';
 import { removeBackground } from "@imgly/background-removal";
-import { PlusIcon, ReloadIcon, EyeClosedIcon, EyeOpenIcon } from '@radix-ui/react-icons';
+import { PlusIcon, ReloadIcon, EyeClosedIcon, EyeOpenIcon, ChevronUpIcon, ChevronDownIcon } from '@radix-ui/react-icons';
 import TextCustomizer from '@/components/editor/text-customizer';
 import Image from 'next/image';
 import { Accordion } from '@/components/ui/accordion';
@@ -78,6 +78,7 @@ const Page = () => {
     });
     const [isProcessing, setIsProcessing] = useState(false);
     const [initialDimensions, setInitialDimensions] = useState<{ width: number; height: number } | null>(null);
+    const [layerHistory, setLayerHistory] = useState<string[]>([]);
 
     const handleUploadImage = () => {
         if (fileInputRef.current) {
@@ -292,8 +293,19 @@ const Page = () => {
         }));
     };
 
-    const handleLayerSelect = (layerId: string) => {
+    const handleLayerSelect = (layerId: string | null) => {
+        if (!layerId) {
+            setSelectedLayer(null);
+            return;
+        }
+
         setSelectedLayer(layerId);
+        
+        // Update layer history
+        setLayerHistory(prev => {
+            const newHistory = prev.filter(id => id !== layerId);
+            return [...newHistory, layerId];
+        });
         
         // Determine if the selected layer is an image or text
         const isImage = layers.images.some(img => img.id === layerId);
@@ -315,6 +327,35 @@ const Page = () => {
                 ? { ...text, ...updates }
                 : text
         ));
+    };
+
+    const moveLayer = (layerId: string, direction: 'up' | 'down') => {
+        setLayers(prev => {
+            const images = [...prev.images];
+            const currentIndex = images.findIndex(layer => layer.id === layerId);
+            
+            if (currentIndex === -1) return prev;
+            
+            const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+            if (newIndex < 0 || newIndex >= images.length) return prev;
+            
+            // Swap layers
+            [images[currentIndex], images[newIndex]] = [images[newIndex], images[currentIndex]];
+            
+            return {
+                ...prev,
+                images
+            };
+        });
+    };
+
+    const getLayerZIndex = (layerId: string, index: number, totalLayers: number) => {
+        if (selectedLayer === layerId) return 1000;
+        const historyIndex = layerHistory.indexOf(layerId);
+        if (historyIndex !== -1) {
+            return 500 + historyIndex;
+        }
+        return totalLayers - index;
     };
 
     return (
@@ -358,6 +399,32 @@ const Page = () => {
                                             onClick={() => setSelectedLayer(layer.id)}
                                         >
                                             <div className="flex items-center gap-2">
+                                                <div className="flex flex-col">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                        disabled={index === 0}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            moveLayer(layer.id, 'up');
+                                                        }}
+                                                    >
+                                                        <ChevronUpIcon className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                        disabled={index === layers.images.length - 1}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            moveLayer(layer.id, 'down');
+                                                        }}
+                                                    >
+                                                        <ChevronDownIcon className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                                 <div className="relative w-12 h-12 rounded-md overflow-hidden">
                                                     <ResizableImage
                                                         src={layer.imageUrl}
@@ -456,7 +523,7 @@ const Page = () => {
                                 
                                 <div 
                                     className="relative w-full h-full"
-                                    onClick={() => setSelectedLayer(null)}
+                                    onClick={() => handleLayerSelect(null)}
                                 >
                                     {[...layers.images].reverse().map((layer, index) => (
                                         layer.isVisible && (
@@ -474,9 +541,7 @@ const Page = () => {
                                                     height: layer.size.height,
                                                     transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`,
                                                     transformOrigin: 'center',
-                                                    zIndex: selectedLayer === layer.id ? 
-                                                        layers.images.length + 1 : 
-                                                        layers.images.length - index,
+                                                    zIndex: getLayerZIndex(layer.id, index, layers.images.length),
                                                     overflow: 'hidden'
                                                 }}
                                                 onClick={(e) => {
@@ -536,9 +601,11 @@ const Page = () => {
                                                 fontSize: `${textSet.fontSize}px`,
                                                 fontWeight: textSet.fontWeight,
                                                 opacity: textSet.opacity,
-                                                zIndex: selectedLayer === textSet.id ? 
-                                                    layers.images.length + textSets.length + 1 : 
-                                                    layers.images.length + index
+                                                zIndex: getLayerZIndex(
+                                                    textSet.id, 
+                                                    index, 
+                                                    layers.images.length + textSets.length
+                                                )
                                             }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
