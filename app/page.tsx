@@ -7,11 +7,16 @@ import { HeroImages } from '@/components/hero-images';
 import { HoverBorderGradient } from '@/components/ui/hover-border-gradient';
 import { HeroParallaxImages } from '@/components/hero-parallax-images';
 import { AdditionalInfo } from '@/components/additional-info';
+import { ModeToggle } from '@/components/mode-toggle';
 import Link from 'next/link';
 
 const page = () => {
     return ( 
         <div className='flex flex-col min-h-screen items-center w-full'>
+            <div className="w-full flex justify-end p-4">
+                <ModeToggle />
+            </div>
+
             <HeroHighlight>
                 <motion.h1
                     initial={{ opacity: 0, y: 20 }} 

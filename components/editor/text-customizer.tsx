@@ -9,10 +9,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { cn } from "@/lib/utils";
 
 interface TextCustomizerProps {
     textSet: {
-        id: number;
+        id: string;
         text: string;
         fontFamily: string;
         top: number;
@@ -25,14 +26,27 @@ interface TextCustomizerProps {
         shadowColor: string;
         shadowSize: number;
     };
-    handleAttributeChange: (id: number, attribute: string, value: any) => void;
-    removeTextSet: (id: number) => void;
-    duplicateTextSet: (textSet: any) => void; // Add this line
+    handleAttributeChange: (id: string, attribute: string, value: any) => void;
+    removeTextSet: (id: string) => void;
+    duplicateTextSet: (textSet: any) => void;
+    isSelected?: boolean;
 }
 
-const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttributeChange, removeTextSet, duplicateTextSet }) => {
+export default function TextCustomizer({ 
+    textSet, 
+    handleAttributeChange, 
+    removeTextSet, 
+    duplicateTextSet,
+    isSelected 
+}: TextCustomizerProps) {
     return (
-        <AccordionItem value={`item-${textSet.id}`}>
+        <AccordionItem 
+            value={textSet.id}
+            className={cn(
+                "border rounded-lg p-2 mb-2",
+                isSelected && "ring-2 ring-primary"
+            )}
+        >
             <AccordionTrigger>{textSet.text}</AccordionTrigger>
             <AccordionContent className='p-1'>
                 <InputField
@@ -109,12 +123,10 @@ const TextCustomizer: React.FC<TextCustomizerProps> = ({ textSet, handleAttribut
                     handleAttributeChange={(attribute, value) => handleAttributeChange(textSet.id, attribute, value)}
                 />
                 <div className="flex flex-row gap-2 my-8">
-                    <Button onClick={() => duplicateTextSet(textSet)}>Duplicate Text Set</Button>
+                    <Button onClick={() => duplicateTextSet(textSet.id)}>Duplicate Text Set</Button>
                     <Button onClick={() => removeTextSet(textSet.id)} variant="destructive">Remove Text Set</Button>
                 </div>
             </AccordionContent>
         </AccordionItem>
     );
-};
-
-export default TextCustomizer;
+}

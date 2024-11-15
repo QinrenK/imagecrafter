@@ -9,13 +9,51 @@ import { Separator } from '@/components/ui/separator';
 import Authenticate from '@/components/authenticate';
 import { Button } from '@/components/ui/button';
 import { removeBackground } from "@imgly/background-removal";
-import { PlusIcon, ReloadIcon } from '@radix-ui/react-icons';
+import { PlusIcon, ReloadIcon, EyeClosedIcon, EyeOpenIcon } from '@radix-ui/react-icons';
 import TextCustomizer from '@/components/editor/text-customizer';
 import Image from 'next/image';
 import { Accordion } from '@/components/ui/accordion';
 import '@/app/fonts.css'
 import { ModeToggle } from '@/components/mode-toggle';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { Slider } from "@/components/ui/slider";
+import { IntegratedPanel } from '@/components/editor/integrated-panel';
+import { ResizableImage } from '@/components/editor/resizable-image';
+
+interface TextSet {
+    id: string;
+    text: string;
+    fontFamily: string;
+    top: number;
+    left: number;
+    color: string;
+    fontSize: number;
+    fontWeight: number;
+    opacity: number;
+    shadowColor: string;
+    shadowSize: number;
+    rotation: number;
+}
+
+interface ImageLayer {
+  id: string;
+  type: 'original' | 'removed-bg';
+  imageUrl: string;
+  name: string;
+  isVisible: boolean;
+  opacity: number;
+  parentId?: string;
+  size: { width: number; height: number };
+  rotation: number;
+  position: { x: number; y: number };
+}
+
+interface LayerState {
+  images: ImageLayer[];
+  texts: TextSet[];
+}
 
 const Page = () => {
     const { user } = useUser();
@@ -23,9 +61,16 @@ const Page = () => {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [isImageSetupDone, setIsImageSetupDone] = useState<boolean>(false);
     const [removedBgImageUrl, setRemovedBgImageUrl] = useState<string | null>(null);
-    const [textSets, setTextSets] = useState<Array<any>>([]);
+    const [textSets, setTextSets] = useState<TextSet[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
+    const [layers, setLayers] = useState<LayerState>({
+        images: [],
+        texts: textSets
+    });
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [initialDimensions, setInitialDimensions] = useState<{ width: number; height: number } | null>(null);
 
     const handleUploadImage = () => {
         if (fileInputRef.current) {
@@ -36,25 +81,80 @@ const Page = () => {
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
+            setIsProcessing(true);
             const imageUrl = URL.createObjectURL(file);
-            setSelectedImage(imageUrl);
-            await setupImage(imageUrl);
-        }
-    };
 
-    const setupImage = async (imageUrl: string) => {
-        try {
-            const imageBlob = await removeBackground(imageUrl);
-            const url = URL.createObjectURL(imageBlob);
-            setRemovedBgImageUrl(url);
-            setIsImageSetupDone(true);
-        } catch (error) {
-            console.error(error);
+            // Get image dimensions before creating layer
+            const img = document.createElement('img');
+            
+            img.onload = async () => {
+                const aspectRatio = img.width / img.height;
+                const containerWidth = window.innerWidth * 0.6;
+                const containerHeight = window.innerHeight * 0.6;
+
+                // Calculate dimensions to fit container while maintaining aspect ratio
+                let newWidth = containerWidth;
+                let newHeight = newWidth / aspectRatio;
+
+                if (newHeight > containerHeight) {
+                    newHeight = containerHeight;
+                    newWidth = newHeight * aspectRatio;
+                }
+
+                const newImageId = `image-${Date.now()}`;
+                
+                // Create layers with calculated dimensions
+                const originalLayer: ImageLayer = {
+                    id: newImageId,
+                    type: 'original',
+                    imageUrl,
+                    name: file.name,
+                    isVisible: true,
+                    opacity: 1,
+                    rotation: 0,
+                    position: { x: 50, y: 50 },
+                    size: {
+                        width: Math.round(newWidth),
+                        height: Math.round(newHeight)
+                    }
+                };
+
+                setLayers(prev => ({
+                    ...prev,
+                    images: [...prev.images, originalLayer]
+                }));
+
+                // Process background removal with same dimensions
+                try {
+                    const imageBlob = await removeBackground(imageUrl);
+                    const removedBgUrl = URL.createObjectURL(imageBlob);
+                    
+                    const removedBgLayer: ImageLayer = {
+                        ...originalLayer,
+                        id: `removed-bg-${Date.now()}`,
+                        type: 'removed-bg',
+                        imageUrl: removedBgUrl,
+                        name: `${file.name} (No Background)`,
+                        parentId: newImageId,
+                    };
+
+                    setLayers(prev => ({
+                        ...prev,
+                        images: [...prev.images, removedBgLayer]
+                    }));
+                } catch (error) {
+                    console.error('Background removal failed:', error);
+                } finally {
+                    setIsProcessing(false);
+                }
+            };
+
+            img.src = imageUrl;
         }
     };
 
     const addNewTextSet = () => {
-        const newId = Math.max(...textSets.map(set => set.id), 0) + 1;
+        const newId = `text-${Date.now()}`;
         setTextSets(prev => [...prev, {
             id: newId,
             text: 'edit',
@@ -71,18 +171,18 @@ const Page = () => {
         }]);
     };
 
-    const handleAttributeChange = (id: number, attribute: string, value: any) => {
+    const handleAttributeChange = (id: string, attribute: string, value: any) => {
         setTextSets(prev => prev.map(set => 
             set.id === id ? { ...set, [attribute]: value } : set
         ));
     };
 
-    const duplicateTextSet = (textSet: any) => {
-        const newId = Math.max(...textSets.map(set => set.id), 0) + 1;
+    const duplicateTextSet = (textSet: TextSet) => {
+        const newId = `text-${Date.now()}`;
         setTextSets(prev => [...prev, { ...textSet, id: newId }]);
     };
 
-    const removeTextSet = (id: number) => {
+    const removeTextSet = (id: string) => {
         setTextSets(prev => prev.filter(set => set.id !== id));
     };
 
@@ -146,6 +246,51 @@ const Page = () => {
         }
     };
 
+    const toggleLayerVisibility = (layerId: string) => {
+        setLayers(prev => ({
+            ...prev,
+            images: prev.images.map(layer => 
+                layer.id === layerId 
+                    ? { ...layer, isVisible: !layer.isVisible }
+                    : layer
+            )
+        }));
+    };
+
+    const updateLayerOpacity = (layerId: string, opacity: number) => {
+        setLayers(prev => ({
+            ...prev,
+            images: prev.images.map(layer => 
+                layer.id === layerId 
+                    ? { ...layer, opacity }
+                    : layer
+            )
+        }));
+    };
+
+    const handleImageUpdate = (layerId: string, updates: Partial<ImageLayer>) => {
+        setLayers(prev => ({
+            ...prev,
+            images: prev.images.map(layer => 
+                layer.id === layerId 
+                    ? { ...layer, ...updates }
+                    : layer
+            )
+        }));
+    };
+
+    const handleLayerSelect = (layerId: string) => {
+        setSelectedLayer(layerId);
+    };
+
+    const handleTextUpdate = (textId: string, updates: Partial<TextSet>) => {
+        setTextSets(prev => prev.map(text => 
+            text.id === textId 
+                ? { ...text, ...updates }
+                : text
+        ));
+    };
+
     return (
         <>
             {user && session && session.user ? (
@@ -172,81 +317,181 @@ const Page = () => {
                         </div>
                     </header>
                     <Separator />
-                    {selectedImage ? (
-                        <div className='flex flex-col md:flex-row items-start justify-start gap-10 w-full h-screen p-10'>
-                            <div className="flex flex-col items-start justify-start w-full md:w-1/2 gap-4">
-                                <canvas ref={canvasRef} style={{ display: 'none' }} />
-                                <Button onClick={saveCompositeImage}>
-                                    Save image
-                                </Button>
-                                <div className="min-h-[400px] w-[80%] p-4 border border-border rounded-lg relative overflow-hidden">
-                                    {isImageSetupDone ? (
-                                        <Image
-                                            src={selectedImage} 
-                                            alt="Uploaded"
-                                            layout="fill"
-                                            objectFit="contain" 
-                                            objectPosition="center" 
-                                        />
-                                    ) : (
-                                        <span className='flex items-center w-full gap-2'><ReloadIcon className='animate-spin' /> Loading, please wait</span>
-                                    )}
-                                    {isImageSetupDone && textSets.map(textSet => (
-                                        <div
-                                            key={textSet.id}
-                                            style={{
-                                                position: 'absolute',
-                                                top: `${50 - textSet.top}%`,
-                                                left: `${textSet.left + 50}%`,
-                                                transform: `translate(-50%, -50%) rotate(${textSet.rotation}deg)`,
-                                                color: textSet.color,
-                                                textAlign: 'center',
-                                                fontSize: `${textSet.fontSize}px`,
-                                                fontWeight: textSet.fontWeight,
-                                                fontFamily: textSet.fontFamily,
-                                                opacity: textSet.opacity
-                                            }}
+                    <div className='flex flex-row gap-4 p-4 h-[calc(100vh-5rem)]'>
+                        <div className="w-64 flex flex-col gap-4">
+                            <Card className="p-4">
+                                <h3 className="text-sm font-medium mb-2">Layers</h3>
+                                <ScrollArea className="h-[calc(100vh-12rem)]">
+                                    {layers.images.map((layer, index) => (
+                                        <div 
+                                            key={layer.id}
+                                            className={cn(
+                                                "p-2 rounded-md cursor-pointer hover:bg-accent mb-2",
+                                                selectedLayer === layer.id && "bg-accent"
+                                            )}
+                                            onClick={() => setSelectedLayer(layer.id)}
                                         >
-                                            {textSet.text}
+                                            <div className="flex items-center gap-2">
+                                                <div className="relative w-12 h-12 rounded-md overflow-hidden">
+                                                    <ResizableImage
+                                                        src={layer.imageUrl}
+                                                        alt={layer.name}
+                                                        isSelected={selectedLayer === layer.id}
+                                                        opacity={layer.opacity}
+                                                        type={layer.type}
+                                                        size={layer.size}
+                                                        rotation={layer.rotation}
+                                                        onResize={(size) => handleImageUpdate(layer.id, { size })}
+                                                        onRotate={(rotation) => handleImageUpdate(layer.id, { rotation })}
+                                                        onSelect={() => handleLayerSelect(layer.id)}
+                                                        zIndex={selectedLayer === layer.id ? 
+                                                            layers.images.length + 1 : 
+                                                            layers.images.length - index}
+                                                    />
+                                                    {!layer.isVisible && (
+                                                        <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                                                            <EyeClosedIcon className="w-4 h-4" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-col flex-1 min-w-0">
+                                                    <span className="text-sm truncate">
+                                                        {layer.name}
+                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleLayerVisibility(layer.id);
+                                                            }}
+                                                        >
+                                                            {layer.isVisible ? (
+                                                                <EyeOpenIcon className="w-4 h-4" />
+                                                            ) : (
+                                                                <EyeClosedIcon className="w-4 h-4" />
+                                                            )}
+                                                        </Button>
+                                                        <Slider 
+                                                            className="w-20"
+                                                            value={[layer.opacity * 100]}
+                                                            onValueChange={([value]) => {
+                                                                updateLayerOpacity(layer.id, value / 100);
+                                                            }}
+                                                            max={100}
+                                                            step={1}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     ))}
-                                    {removedBgImageUrl && (
-                                        <Image
-                                            src={removedBgImageUrl}
-                                            alt="Removed bg"
-                                            layout="fill"
-                                            objectFit="contain" 
-                                            objectPosition="center" 
-                                            className="absolute top-0 left-0 w-full h-full"
-                                        /> 
-                                    )}
+
+                                    {textSets.map((textSet, index) => (
+                                        <div 
+                                            key={textSet.id}
+                                            className={cn(
+                                                "p-2 rounded-md cursor-pointer hover:bg-accent mb-2",
+                                                selectedLayer === textSet.id && "bg-accent"
+                                            )}
+                                            onClick={() => setSelectedLayer(textSet.id)}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-12 h-12 rounded-md bg-accent/50 flex items-center justify-center">
+                                                    <span className="text-xs">Text {index + 1}</span>
+                                                </div>
+                                                <span className="text-sm truncate">{textSet.text}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </ScrollArea>
+                            </Card>
+                        </div>
+
+                        <div className="flex-1 flex flex-col items-center gap-4">
+                            <Button 
+                                onClick={saveCompositeImage}
+                                className="w-fit px-8"
+                            >
+                                Save image
+                            </Button>
+                            
+                            <div className="relative w-full h-[calc(100vh-12rem)] border border-border rounded-lg overflow-hidden">
+                                {isProcessing && (
+                                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-[10000]">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <ReloadIcon className="w-8 h-8 animate-spin" />
+                                            <p className="text-sm text-muted-foreground">Processing image...</p>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                <div 
+                                    className="relative w-full h-full"
+                                    onClick={() => setSelectedLayer(null)}
+                                >
+                                    {[...layers.images].reverse().map((layer, index) => (
+                                        layer.isVisible && (
+                                            <div 
+                                                key={layer.id}
+                                                className={cn(
+                                                    "absolute",
+                                                    selectedLayer === layer.id && "ring-2 ring-primary ring-offset-2"
+                                                )}
+                                                style={{
+                                                    position: 'absolute',
+                                                    left: `${layer.position.x}%`,
+                                                    top: `${layer.position.y}%`,
+                                                    width: layer.size.width,
+                                                    height: layer.size.height,
+                                                    transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`,
+                                                    transformOrigin: 'center',
+                                                    zIndex: selectedLayer === layer.id ? 
+                                                        layers.images.length + 1 : 
+                                                        layers.images.length - index
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleLayerSelect(layer.id);
+                                                }}
+                                            >
+                                                <Image
+                                                    src={layer.imageUrl}
+                                                    alt={layer.name}
+                                                    width={layer.size.width}
+                                                    height={layer.size.height}
+                                                    className={cn(
+                                                        "transition-all duration-200",
+                                                        layer.type === 'removed-bg' && "mix-blend-normal"
+                                                    )}
+                                                    style={{ 
+                                                        opacity: layer.opacity,
+                                                        maxWidth: '100%',
+                                                        height: 'auto',
+                                                        objectFit: 'contain'
+                                                    }}
+                                                    priority
+                                                />
+                                            </div>
+                                        )
+                                    ))}
                                 </div>
                             </div>
-                            <div className='flex flex-col w-full md:w-1/2'>
-                                <Button variant={'secondary'} onClick={addNewTextSet}><PlusIcon className='mr-2'/> Add New Text Set</Button>
-                                <ScrollArea className="h-[calc(100vh-10rem)] p-2">
-                                    <Accordion type="single" collapsible className="w-full mt-2">
-                                        {textSets.map(textSet => (
-                                            <TextCustomizer 
-                                                key={textSet.id}
-                                                textSet={textSet}
-                                                handleAttributeChange={handleAttributeChange}
-                                                removeTextSet={removeTextSet}
-                                                duplicateTextSet={duplicateTextSet}
-                                            />
-                                        ))}
-                                    </Accordion>
-                                </ScrollArea>
-                            </div>
                         </div>
-                    ) : (
-                        <div className='flex items-center justify-center min-h-screen w-full'>
-                            <h2 className="text-xl font-semibold">Welcome to ImageCrafter</h2>
-                            <p className="text-muted-foreground">
-                                Upload an image to start creating your design
-                            </p>
-                        </div>
-                    )}
+
+                        <IntegratedPanel
+                            selectedLayer={selectedLayer}
+                            layers={{
+                                images: layers.images,
+                                texts: textSets
+                            }}
+                            onImageUpdate={handleImageUpdate}
+                            onTextUpdate={handleTextUpdate}
+                            onAddText={addNewTextSet}
+                        />
+                    </div>
                 </div>
             ) : (
                 <Authenticate />
