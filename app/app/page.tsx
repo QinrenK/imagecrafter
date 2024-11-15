@@ -201,62 +201,132 @@ const Page = () => {
     };
 
     const saveCompositeImage = () => {
-        if (!canvasRef.current || !isImageSetupDone) return;
-    
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-    
-        const bgImg = new (window as any).Image();
-        bgImg.crossOrigin = "anonymous";
-        bgImg.onload = () => {
-            canvas.width = bgImg.width;
-            canvas.height = bgImg.height;
-    
-            ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-    
-            textSets.forEach(textSet => {
-                ctx.save(); // Save the current state
-                ctx.font = `${textSet.fontWeight} ${textSet.fontSize * 3}px ${textSet.fontFamily}`;
-                ctx.fillStyle = textSet.color;
-                ctx.globalAlpha = textSet.opacity;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-    
-                const x = canvas.width * (textSet.position.x + 50) / 100;
-                const y = canvas.height * (50 - textSet.position.y) / 100;
-    
-                // Move the context to the text position and rotate
-                ctx.translate(x, y);
-                ctx.rotate((textSet.rotation * Math.PI) / 180); // Convert degrees to radians
-                ctx.fillText(textSet.text, 0, 0); // Draw text at the origin (0, 0)
-                ctx.restore(); // Restore the original state
-            });
-    
-            if (removedBgImageUrl) {
-                const removedBgImg = new (window as any).Image();
-                removedBgImg.crossOrigin = "anonymous";
-                removedBgImg.onload = () => {
-                    ctx.drawImage(removedBgImg, 0, 0, canvas.width, canvas.height);
-                    const timestamp = Date.now();
-                    triggerDownload(timestamp.toString());
-                };
-                removedBgImg.src = removedBgImageUrl;
-            } else {
-                const timestamp = Date.now();
-                triggerDownload(timestamp.toString());
+        if (!canvasRef.current) {
+            console.error('Canvas reference not found');
+            return;
+        }
+
+        try {
+            setIsProcessing(true);
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error('Could not get canvas context');
+                return;
             }
-        };
-        bgImg.src = selectedImage || '';
-    
-        function triggerDownload(imageSetId: string) {
-            if (!canvasRef.current) return;
-            
-            const dataUrl = canvasRef.current.toDataURL('image/webp', 0.8);
-            const link = document.createElement('a');
-            link.download = `imagecrafter-${imageSetId}.webp`;
-            link.href = dataUrl;
-            link.click();
+
+            // Set canvas size to match the container
+            const containerWidth = window.innerWidth * 0.6;
+            const containerHeight = window.innerHeight * 0.6;
+            canvas.width = containerWidth;
+            canvas.height = containerHeight;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Create a promise to handle image loading
+            const loadImage = (url: string): Promise<HTMLImageElement> => {
+                return new Promise((resolve, reject) => {
+                    const img = document.createElement('img');
+                    img.crossOrigin = "anonymous";
+                    img.onload = () => resolve(img);
+                    img.onerror = (e) => reject(e);
+                    img.src = url;
+                });
+            };
+
+            // Compose the image
+            const composeImage = async () => {
+                try {
+                    // Draw white background
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    // Draw images
+                    for (const layer of [...layers.images].reverse()) {
+                        if (!layer.isVisible) continue;
+
+                        try {
+                            const img = await loadImage(layer.imageUrl);
+                            
+                            ctx.save();
+                            
+                            // Apply transformations
+                            ctx.globalAlpha = layer.opacity;
+                            
+                            // Calculate center position
+                            const x = (layer.position.x / 100) * canvas.width;
+                            const y = (layer.position.y / 100) * canvas.height;
+                            
+                            // Move to position, rotate, then draw
+                            ctx.translate(x, y);
+                            ctx.rotate((layer.rotation * Math.PI) / 180);
+                            
+                            // Draw image centered at transformed position
+                            ctx.drawImage(
+                                img,
+                                -layer.size.width / 2,
+                                -layer.size.height / 2,
+                                layer.size.width,
+                                layer.size.height
+                            );
+                            
+                            ctx.restore();
+                        } catch (error) {
+                            console.error(`Failed to load image for layer ${layer.id}:`, error);
+                        }
+                    }
+
+                    // Draw text layers
+                    textSets.forEach(textSet => {
+                        ctx.save();
+                        
+                        // Configure text properties
+                        ctx.font = `${textSet.fontWeight} ${textSet.fontSize}px ${textSet.fontFamily}`;
+                        ctx.fillStyle = textSet.color;
+                        ctx.globalAlpha = textSet.opacity;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+
+                        // Calculate position
+                        const x = canvas.width * (textSet.position.x / 100);
+                        const y = canvas.height * (textSet.position.y / 100);
+
+                        // Apply rotation
+                        ctx.translate(x, y);
+                        ctx.rotate((textSet.rotation * Math.PI) / 180);
+                        
+                        // Draw text
+                        ctx.fillText(textSet.text, 0, 0);
+                        ctx.restore();
+                    });
+
+                    // Convert to PNG and download
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    const dataUrl = canvas.toDataURL('image/png', 1.0);
+                    
+                    // Create and trigger download
+                    const link = document.createElement('a');
+                    link.download = `imagecrafter-${timestamp}.png`;
+                    link.href = dataUrl;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                } catch (error) {
+                    console.error('Error composing image:', error);
+                    throw error;
+                }
+            };
+
+            // Execute composition
+            composeImage().finally(() => {
+                setIsProcessing(false);
+            });
+
+        } catch (error) {
+            console.error('Error saving image:', error);
+            setIsProcessing(false);
         }
     };
 
@@ -359,7 +429,7 @@ const Page = () => {
     };
 
     return (
-        <>
+        <React.Fragment>
             {user && session && session.user ? (
                 <div className='flex flex-col h-screen'>
                     <header className='flex flex-row items-center justify-between p-5 px-10'>
@@ -507,8 +577,16 @@ const Page = () => {
                             <Button 
                                 onClick={saveCompositeImage}
                                 className="w-fit px-8"
+                                disabled={!layers.images.length}
                             >
-                                Save image
+                                {isProcessing ? (
+                                    <>
+                                        <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    'Save image'
+                                )}
                             </Button>
                             
                             <div className="relative w-full h-[calc(100vh-12rem)] border border-border rounded-lg overflow-hidden">
@@ -635,7 +713,15 @@ const Page = () => {
             ) : (
                 <Authenticate />
             )}
-        </>
+            <canvas
+                ref={canvasRef}
+                style={{ display: 'none' }}
+                aria-hidden="true"
+                className="absolute"
+                width={window.innerWidth * 0.6}
+                height={window.innerHeight * 0.6}
+            />
+        </React.Fragment>
     );
 }
 
