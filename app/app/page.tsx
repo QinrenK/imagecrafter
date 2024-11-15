@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { IntegratedPanel } from '@/components/editor/integrated-panel';
 import { ResizableImage } from '@/components/editor/resizable-image';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent } from "@/components/ui/dropdown-menu"
 
 interface TextSet {
     id: string;
@@ -429,7 +430,7 @@ const Page = () => {
     };
 
     return (
-        <React.Fragment>
+        <>
             {user && session && session.user ? (
                 <div className='flex flex-col h-screen'>
                     <header className='flex flex-row items-center justify-between p-5 px-10'>
@@ -446,6 +447,20 @@ const Page = () => {
                             />
                             <Button onClick={handleUploadImage}>
                                 Upload image
+                            </Button>
+                            <Button 
+                                onClick={saveCompositeImage}
+                                disabled={!layers.images.length}
+                                className="w-fit"
+                            >
+                                {isProcessing ? (
+                                    <>
+                                        <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    'Save image'
+                                )}
                             </Button>
                             <ModeToggle />
                             <Avatar>
@@ -574,21 +589,6 @@ const Page = () => {
                         </div>
 
                         <div className="flex-1 flex flex-col items-center gap-4">
-                            <Button 
-                                onClick={saveCompositeImage}
-                                className="w-fit px-8"
-                                disabled={!layers.images.length}
-                            >
-                                {isProcessing ? (
-                                    <>
-                                        <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                                        Saving...
-                                    </>
-                                ) : (
-                                    'Save image'
-                                )}
-                            </Button>
-                            
                             <div className="relative w-full h-[calc(100vh-12rem)] border border-border rounded-lg overflow-hidden">
                                 {isProcessing && (
                                     <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-[10000]">
@@ -721,7 +721,7 @@ const Page = () => {
                 width={window.innerWidth * 0.6}
                 height={window.innerHeight * 0.6}
             />
-        </React.Fragment>
+        </>
     );
 }
 
