@@ -21,24 +21,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className} suppressHydrationWarning>
         <SupabaseProvider>
-            <UserProvider>
-              <ThemeProvider
-                attribute="class"
-                defaultTheme="light"
-                enableSystem
-                disableTransitionOnChange
-              >
-                <div>
-                  {children}
-                  <Analytics />
-                  <SpeedInsights />
-                  <Toaster />
-                </div>
-              </ThemeProvider>
-            </UserProvider>
+          <UserProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+              suppressHydrationWarning
+            >
+              <div className="min-h-screen bg-background">
+                {children}
+                <Analytics />
+                <SpeedInsights />
+                <Toaster />
+              </div>
+            </ThemeProvider>
+          </UserProvider>
         </SupabaseProvider>
       </body>
     </html>
