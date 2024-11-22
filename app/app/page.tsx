@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import Authenticate from '@/components/authenticate';
 import { Button } from '@/components/ui/button';
 import { removeBackground } from "@imgly/background-removal";
-import { PlusIcon, ReloadIcon, EyeClosedIcon, EyeOpenIcon, ChevronUpIcon, ChevronDownIcon } from '@radix-ui/react-icons';
+import { PlusIcon, ReloadIcon, EyeClosedIcon, EyeOpenIcon, ChevronUpIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
 import TextCustomizer from '@/components/editor/text-customizer';
 import Image from 'next/image';
 import { Accordion } from '@/components/ui/accordion';
@@ -82,6 +82,8 @@ const Page = () => {
     const [initialDimensions, setInitialDimensions] = useState<{ width: number; height: number } | null>(null);
     const [layerHistory, setLayerHistory] = useState<string[]>([]);
     const [canvasDimensions, setCanvasDimensions] = useState({ width: 800, height: 600 });
+    const [isLayersPanelOpen, setIsLayersPanelOpen] = useState(true);
+    const [isIntegratedPanelOpen, setIsIntegratedPanelOpen] = useState(true);
 
     useEffect(() => {
         const updateDimensions = () => {
@@ -486,54 +488,80 @@ const Page = () => {
                         </div>
                     </header>
                     <Separator />
-                    <div className='flex flex-row gap-4 p-4 h-[calc(100vh-5rem)]'>
-                        <div className="w-64 flex flex-col gap-4">
-                            <Card className="p-4">
-                                <h3 className="text-sm font-medium mb-2">Layers</h3>
-                                <ScrollArea className="h-[calc(100vh-12rem)]">
-                                    {layers.images.map((layer) => (
-                                        <LayerItem
-                                            key={layer.id}
-                                            layer={layer}
-                                            isSelected={selectedLayer === layer.id}
-                                            onSelect={handleLayerSelect}
-                                            onVisibilityToggle={toggleLayerVisibility}
-                                            onOpacityChange={updateLayerOpacity}
-                                        />
-                                    ))}
+                    <div className='flex flex-row gap-4 p-4 h-[calc(100vh-5rem)] relative'>
+                        {/* Layers Panel */}
+                        <div className={cn(
+                            "flex transition-all duration-300 ease-in-out",
+                            isLayersPanelOpen ? "w-64" : "w-0"
+                        )}>
+                            <div className={cn(
+                                "flex-1 flex flex-col gap-4 overflow-hidden",
+                                !isLayersPanelOpen && "hidden"
+                            )}>
+                                <Card className="p-4">
+                                    <h3 className="text-sm font-medium mb-2">Layers</h3>
+                                    <ScrollArea className="h-[calc(100vh-12rem)]">
+                                        {layers.images.map((layer) => (
+                                            <LayerItem
+                                                key={layer.id}
+                                                layer={layer}
+                                                isSelected={selectedLayer === layer.id}
+                                                onSelect={handleLayerSelect}
+                                                onVisibilityToggle={toggleLayerVisibility}
+                                                onOpacityChange={updateLayerOpacity}
+                                            />
+                                        ))}
 
-                                    {textSets.map((textSet, index) => (
-                                        <div 
-                                            key={textSet.id}
-                                            className={cn(
-                                                "p-2 rounded-md cursor-pointer hover:bg-accent mb-2",
-                                                selectedLayer === textSet.id && "bg-accent"
-                                            )}
-                                            onClick={() => setSelectedLayer(textSet.id)}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <div 
-                                                    className="w-12 h-12 rounded-md bg-accent/50 flex items-center justify-center"
-                                                    role="presentation"
-                                                >
-                                                    <span className="text-xs">Text {index + 1}</span>
-                                                </div>
-                                                <div className="flex flex-col flex-1 min-w-0">
-                                                    <span className="text-sm truncate">{textSet.text}</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {textSet.fontFamily}
+                                        {textSets.map((textSet, index) => (
+                                            <div 
+                                                key={textSet.id}
+                                                className={cn(
+                                                    "p-2 rounded-md cursor-pointer hover:bg-accent mb-2",
+                                                    selectedLayer === textSet.id && "bg-accent"
+                                                )}
+                                                onClick={() => setSelectedLayer(textSet.id)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div 
+                                                        className="w-12 h-12 rounded-md bg-accent/50 flex items-center justify-center"
+                                                        role="presentation"
+                                                    >
+                                                        <span className="text-xs">Text {index + 1}</span>
+                                                    </div>
+                                                    <div className="flex flex-col flex-1 min-w-0">
+                                                        <span className="text-sm truncate">{textSet.text}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {textSet.fontFamily}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </ScrollArea>
-                            </Card>
+                                        ))}
+                                    </ScrollArea>
+                                </Card>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background shadow-md rounded-l-none"
+                                onClick={() => setIsLayersPanelOpen(!isLayersPanelOpen)}
+                            >
+                                {isLayersPanelOpen ? (
+                                    <ChevronLeftIcon className="h-4 w-4" />
+                                ) : (
+                                    <ChevronRightIcon className="h-4 w-4" />
+                                )}
+                            </Button>
                         </div>
 
-                        <div className="flex-1 flex flex-col items-center gap-4">
+                        {/* Main Canvas Area */}
+                        <div className={cn(
+                            "flex-1 flex flex-col items-center gap-4 transition-all duration-300",
+                            !isLayersPanelOpen && "ml-8",
+                            !isIntegratedPanelOpen && "mr-8"
+                        )}>
                             <div className="relative w-full h-[calc(100vh-12rem)] border border-border rounded-lg overflow-hidden">
                                 {isProcessing && (
                                     <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-[10000]">
@@ -642,17 +670,40 @@ const Page = () => {
                             </div>
                         </div>
 
-                        <IntegratedPanel
-                            selectedLayer={selectedLayer}
-                            layers={{
-                                images: layers.images,
-                                texts: textSets
-                            }}
-                            onImageUpdate={handleImageUpdate}
-                            onTextUpdate={handleTextUpdate}
-                            onAddText={addNewTextSet}
-                            onFileChange={handleFileChange}
-                        />
+                        {/* Integrated Panel */}
+                        <div className={cn(
+                            "flex transition-all duration-300 ease-in-out",
+                            isIntegratedPanelOpen ? "w-80" : "w-0"
+                        )}>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-background shadow-md rounded-r-none"
+                                onClick={() => setIsIntegratedPanelOpen(!isIntegratedPanelOpen)}
+                            >
+                                {isIntegratedPanelOpen ? (
+                                    <ChevronRightIcon className="h-4 w-4" />
+                                ) : (
+                                    <ChevronLeftIcon className="h-4 w-4" />
+                                )}
+                            </Button>
+                            <div className={cn(
+                                "flex-1",
+                                !isIntegratedPanelOpen && "hidden"
+                            )}>
+                                <IntegratedPanel
+                                    selectedLayer={selectedLayer}
+                                    layers={{
+                                        images: layers.images,
+                                        texts: textSets
+                                    }}
+                                    onImageUpdate={handleImageUpdate}
+                                    onTextUpdate={handleTextUpdate}
+                                    onAddText={addNewTextSet}
+                                    onFileChange={handleFileChange}
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
             ) : (
