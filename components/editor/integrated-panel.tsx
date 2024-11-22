@@ -54,6 +54,19 @@ export function IntegratedPanel({
   
   const [activeTab, setActiveTab] = React.useState<string>("transform");
 
+  React.useEffect(() => {
+    if (selectedLayer) {
+      const isImage = layers.images.some(img => img.id === selectedLayer);
+      const isText = layers.texts.some(text => text.id === selectedLayer);
+      
+      if (isImage) {
+        setActiveTab("transform");
+      } else if (isText) {
+        setActiveTab("text");
+      }
+    }
+  }, [selectedLayer, layers.images, layers.texts]);
+
   const handleMove = (direction: 'up' | 'down' | 'left' | 'right') => {
     if (!selectedImage) return;
     const step = 1;
@@ -85,6 +98,8 @@ export function IntegratedPanel({
         value={activeTab} 
         onValueChange={setActiveTab}
         className="w-full h-full flex flex-col"
+        data-integrated-panel
+        data-active-tab={activeTab}
       >
         <TabsList className="grid w-full grid-cols-2 mb-4">
           <TabsTrigger 

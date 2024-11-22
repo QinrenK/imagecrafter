@@ -402,12 +402,13 @@ const Page = () => {
         const isText = textSets.some(text => text.id === layerId);
         
         // Update the integrated panel's active tab based on selection
-        if (isImage) {
-            const panel = document.querySelector('[value="transform"]') as HTMLButtonElement;
-            if (panel) panel.click();
-        } else if (isText) {
-            const panel = document.querySelector('[value="text"]') as HTMLButtonElement;
-            if (panel) panel.click();
+        const integratedPanel = document.querySelector('[data-integrated-panel]') as HTMLElement;
+        if (integratedPanel) {
+            if (isImage) {
+                integratedPanel.setAttribute('data-active-tab', 'transform');
+            } else if (isText) {
+                integratedPanel.setAttribute('data-active-tab', 'text');
+            }
         }
     };
 
