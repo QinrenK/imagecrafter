@@ -399,40 +399,41 @@ const Page = () => {
     };
 
     const handleLayerSelect = (layerId: string | null) => {
-        if (!layerId) {
-            setSelectedLayer(null);
-            return;
-        }
-
         setSelectedLayer(layerId);
         
-        // Update layer history
-        setLayerHistory(prev => {
-            const newHistory = prev.filter(id => id !== layerId);
-            return [...newHistory, layerId];
-        });
-        
-        // Determine if the selected layer is an image or text
-        const isImage = layers.images.some(img => img.id === layerId);
-        const isText = textSets.some(text => text.id === layerId);
-        
-        // Update the integrated panel's active tab based on selection
-        const integratedPanel = document.querySelector('[data-integrated-panel]') as HTMLElement;
-        if (integratedPanel) {
-            if (isImage) {
-                integratedPanel.setAttribute('data-active-tab', 'transform');
-            } else if (isText) {
-                integratedPanel.setAttribute('data-active-tab', 'text');
-            }
+        // Only update history when selecting a layer
+        if (layerId) {
+            setLayerHistory(prev => {
+                // Remove the layer from its current position if it exists
+                const newHistory = prev.filter(id => id !== layerId);
+                // Add it to the end (top)
+                return [...newHistory, layerId];
+            });
         }
+        // Don't modify history when deselecting (clicking empty canvas)
     };
 
     const handleTextUpdate = (textId: string, updates: Partial<TextSet>) => {
-        setTextSets(prev => prev.map(text => 
-            text.id === textId 
-                ? { ...text, ...updates }
-                : text
-        ));
+        setTextSets(prevTextSets => {
+            return prevTextSets.map(textSet => {
+                if (textSet.id === textId) {
+                    // Ensure position is properly handled
+                    const newPosition = updates.position 
+                        ? { 
+                            x: updates.position.x ?? textSet.position.x,
+                            y: updates.position.y ?? textSet.position.y
+                          }
+                        : textSet.position;
+
+                    return {
+                        ...textSet,
+                        ...updates,
+                        position: newPosition
+                    };
+                }
+                return textSet;
+            });
+        });
     };
 
     const moveLayer = (layerId: string, direction: 'up' | 'down') => {
@@ -455,13 +456,19 @@ const Page = () => {
         });
     };
 
-    const getLayerZIndex = (layerId: string, index: number, totalLayers: number) => {
-        if (selectedLayer === layerId) return 1000;
-        const historyIndex = layerHistory.indexOf(layerId);
-        if (historyIndex !== -1) {
-            return 500 + historyIndex;
+    const getLayerZIndex = (id: string) => {
+        // Base z-index for all layers
+        const baseZIndex = 100;
+        
+        // Find the index in layer history
+        const historyIndex = layerHistory.indexOf(id);
+        
+        if (historyIndex === -1) {
+            return baseZIndex;
         }
-        return totalLayers - index;
+        
+        // Higher index = higher z-index
+        return baseZIndex + historyIndex;
     };
 
     const handleCropAspectRatio = (ratio: number | null) => {
@@ -557,6 +564,13 @@ const Page = () => {
         document.addEventListener('mouseup', handleMouseUp);
     };
 
+    useEffect(() => {
+        setLayers(prev => ({
+            ...prev,
+            texts: textSets
+        }));
+    }, [textSets]);
+
     return (
         <>
             {user && session && session.user ? (
@@ -609,40 +623,79 @@ const Page = () => {
                             )}>
                                 <Card className="p-4">
                                     <h3 className="text-sm font-medium mb-2">Layers</h3>
-                                    <ScrollArea className="h-[calc(100vh-12rem)]">
-                                        {layers.images.map((layer) => (
-                                            <LayerItem
+                                    <ScrollArea className="flex-1">
+                                        {/* Unified layer list */}
+                                        {[...layers.images, ...textSets.map(text => ({
+                                            id: text.id,
+                                            type: 'text' as const,
+                                            name: text.text.substring(0, 20) + (text.text.length > 20 ? '...' : ''),
+                                            isVisible: true,
+                                            opacity: text.opacity,
+                                            preview: text
+                                        }))].sort((a, b) => {
+                                            const aIndex = layerHistory.indexOf(a.id);
+                                            const bIndex = layerHistory.indexOf(b.id);
+                                            return bIndex - aIndex; // Higher index = appears first in list
+                                        }).map((layer, index) => (
+                                            <div
                                                 key={layer.id}
-                                                layer={layer}
-                                                isSelected={selectedLayer === layer.id}
-                                                onSelect={handleLayerSelect}
-                                                onVisibilityToggle={toggleLayerVisibility}
-                                                onOpacityChange={updateLayerOpacity}
-                                            />
-                                        ))}
-
-                                        {textSets.map((textSet, index) => (
-                                            <div 
-                                                key={textSet.id}
                                                 className={cn(
                                                     "p-2 rounded-md cursor-pointer hover:bg-accent mb-2",
-                                                    selectedLayer === textSet.id && "bg-accent"
+                                                    selectedLayer === layer.id && "bg-accent"
                                                 )}
-                                                onClick={() => setSelectedLayer(textSet.id)}
+                                                onClick={() => handleLayerSelect(layer.id)}
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <div 
-                                                        className="w-12 h-12 rounded-md bg-accent/50 flex items-center justify-center"
+                                                        className="w-12 h-12 rounded-md bg-accent/50 flex items-center justify-center overflow-hidden"
                                                         role="presentation"
                                                     >
-                                                        <span className="text-xs">Text {index + 1}</span>
+                                                        {layer.type === 'text' ? (
+                                                            <span className="text-xs">Text {index + 1}</span>
+                                                        ) : (
+                                                            <Image
+                                                                src={layer.imageUrl}
+                                                                alt={layer.name}
+                                                                width={48}
+                                                                height={48}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        )}
                                                     </div>
                                                     <div className="flex flex-col flex-1 min-w-0">
-                                                        <span className="text-sm truncate">{textSet.text}</span>
+                                                        <span className="text-sm truncate">{layer.name}</span>
                                                         <div className="flex items-center gap-2">
-                                                            <div className="text-xs text-muted-foreground">
-                                                                {textSet.fontFamily}
-                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-6 w-6"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (layer.type !== 'text') {
+                                                                        toggleLayerVisibility(layer.id);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {layer.isVisible ? (
+                                                                    <EyeOpenIcon className="w-4 h-4" />
+                                                                ) : (
+                                                                    <EyeClosedIcon className="w-4 h-4" />
+                                                                )}
+                                                            </Button>
+                                                            <Slider
+                                                                className="w-20"
+                                                                value={[layer.opacity * 100]}
+                                                                onValueChange={([value]) => {
+                                                                    const newOpacity = value / 100;
+                                                                    if (layer.type === 'text') {
+                                                                        handleTextUpdate(layer.id, { opacity: newOpacity });
+                                                                    } else {
+                                                                        updateLayerOpacity(layer.id, newOpacity);
+                                                                    }
+                                                                }}
+                                                                max={100}
+                                                                step={1}
+                                                            />
                                                         </div>
                                                     </div>
                                                 </div>
@@ -685,7 +738,8 @@ const Page = () => {
                                     className="relative w-full h-full"
                                     onClick={() => handleLayerSelect(null)}
                                 >
-                                    {[...layers.images].reverse().map((layer, index) => (
+                                    {/* Render images first */}
+                                    {[...layers.images].map((layer) => (
                                         layer.isVisible && (
                                             <div 
                                                 key={layer.id}
@@ -701,7 +755,7 @@ const Page = () => {
                                                     height: layer.size.height,
                                                     transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`,
                                                     transformOrigin: 'center',
-                                                    zIndex: getLayerZIndex(layer.id, index, layers.images.length)
+                                                    zIndex: getLayerZIndex(layer.id)
                                                 }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -818,11 +872,12 @@ const Page = () => {
                                         )
                                     ))}
 
-                                    {textSets.map((textSet, index) => (
+                                    {/* Render text layers on top */}
+                                    {textSets.map((textSet) => (
                                         <div
                                             key={textSet.id}
                                             className={cn(
-                                                "absolute cursor-move whitespace-pre",
+                                                "absolute cursor-move select-none",
                                                 selectedLayer === textSet.id && "ring-2 ring-primary ring-offset-2"
                                             )}
                                             style={{
@@ -835,12 +890,13 @@ const Page = () => {
                                                 fontSize: `${textSet.fontSize}px`,
                                                 fontWeight: textSet.fontWeight,
                                                 opacity: textSet.opacity,
-                                                whiteSpace: 'pre',
-                                                zIndex: getLayerZIndex(
-                                                    textSet.id, 
-                                                    index, 
-                                                    layers.images.length + textSets.length
-                                                )
+                                                whiteSpace: 'pre-wrap',
+                                                maxWidth: '80%',
+                                                wordBreak: 'break-word',
+                                                zIndex: getLayerZIndex(textSet.id),
+                                                userSelect: 'none',
+                                                WebkitUserSelect: 'none',
+                                                msUserSelect: 'none'
                                             }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
