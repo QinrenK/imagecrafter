@@ -64,6 +64,20 @@ interface LayerState {
   texts: TextSet[];
 }
 
+interface IntegratedPanelProps {
+  selectedLayer: string | null;
+  layers: {
+    images: ImageLayer[];
+    texts: TextSet[];
+  };
+  onImageUpdate: (layerId: string, updates: Partial<ImageLayer>) => void;
+  onTextUpdate: (textId: string, updates: Partial<TextSet>) => void;
+  onAddText: () => void;
+  onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  cropMode: 'free' | 'fixed' | null;
+  setCropMode: (mode: 'free' | 'fixed' | null) => void;
+}
+
 const Page = () => {
     const { user } = useUser();
     const { session } = useSessionContext();
@@ -84,6 +98,7 @@ const Page = () => {
     const [canvasDimensions, setCanvasDimensions] = useState({ width: 800, height: 600 });
     const [isLayersPanelOpen, setIsLayersPanelOpen] = useState(true);
     const [isIntegratedPanelOpen, setIsIntegratedPanelOpen] = useState(true);
+    const [cropMode, setCropMode] = useState<'free' | 'fixed' | null>(null);
 
     useEffect(() => {
         const updateDimensions = () => {
@@ -449,6 +464,99 @@ const Page = () => {
         return totalLayers - index;
     };
 
+    const handleCropAspectRatio = (ratio: number | null) => {
+        if (!selectedLayer) return;
+        const layer = layers.images.find(img => img.id === selectedLayer);
+        if (!layer) return;
+
+        if (ratio === null) {
+            // Reset to full image but keep current position and size
+            handleImageUpdate(layer.id, {
+                crop: {
+                    x: 0,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                    aspect: undefined
+                }
+            });
+            return;
+        }
+
+        // Calculate new crop dimensions while maintaining aspect ratio
+        const imageAspectRatio = layer.size.width / layer.size.height;
+        let newCrop = { x: 0, y: 0, width: 100, height: 100 };
+
+        if (ratio > imageAspectRatio) {
+            // Target ratio is wider than image ratio
+            newCrop.height = (imageAspectRatio / ratio) * 100;
+            newCrop.y = (100 - newCrop.height) / 2;
+        } else {
+            // Target ratio is taller than image ratio
+            newCrop.width = (ratio / imageAspectRatio) * 100;
+            newCrop.x = (100 - newCrop.width) / 2;
+        }
+
+        handleImageUpdate(layer.id, {
+            crop: {
+                ...newCrop,
+                aspect: ratio
+            }
+        });
+    };
+
+    const handleCropResizeStart = (e: React.MouseEvent, handle: string) => {
+        if (!selectedLayer || cropMode !== 'free') return;
+        e.stopPropagation();
+        
+        const layer = layers.images.find(img => img.id === selectedLayer);
+        if (!layer) return;
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startCrop = { ...layer.crop };
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const deltaX = (e.clientX - startX) / layer.size.width * 100;
+            const deltaY = (e.clientY - startY) / layer.size.height * 100;
+
+            let newCrop = { ...startCrop };
+
+            switch (handle) {
+                case 'nw':
+                    newCrop.x = Math.min(Math.max(0, startCrop.x + deltaX), startCrop.x + startCrop.width - 10);
+                    newCrop.y = Math.min(Math.max(0, startCrop.y + deltaY), startCrop.y + startCrop.height - 10);
+                    newCrop.width = Math.max(10, startCrop.width - deltaX);
+                    newCrop.height = Math.max(10, startCrop.height - deltaY);
+                    break;
+                case 'ne':
+                    newCrop.y = Math.min(Math.max(0, startCrop.y + deltaY), startCrop.y + startCrop.height - 10);
+                    newCrop.width = Math.max(10, Math.min(100 - startCrop.x, startCrop.width + deltaX));
+                    newCrop.height = Math.max(10, startCrop.height - deltaY);
+                    break;
+                case 'se':
+                    newCrop.width = Math.max(10, Math.min(100 - startCrop.x, startCrop.width + deltaX));
+                    newCrop.height = Math.max(10, Math.min(100 - startCrop.y, startCrop.height + deltaY));
+                    break;
+                case 'sw':
+                    newCrop.x = Math.min(Math.max(0, startCrop.x + deltaX), startCrop.x + startCrop.width - 10);
+                    newCrop.width = Math.max(10, startCrop.width - deltaX);
+                    newCrop.height = Math.max(10, Math.min(100 - startCrop.y, startCrop.height + deltaY));
+                    break;
+            }
+
+            handleImageUpdate(layer.id, { crop: newCrop });
+        };
+
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    };
+
     return (
         <>
             {user && session && session.user ? (
@@ -593,22 +701,14 @@ const Page = () => {
                                                     height: layer.size.height,
                                                     transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`,
                                                     transformOrigin: 'center',
-                                                    zIndex: getLayerZIndex(layer.id, index, layers.images.length),
-                                                    overflow: 'hidden'
+                                                    zIndex: getLayerZIndex(layer.id, index, layers.images.length)
                                                 }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleLayerSelect(layer.id);
                                                 }}
                                             >
-                                                <div 
-                                                    style={{
-                                                        width: '100%',
-                                                        height: '100%',
-                                                        position: 'relative',
-                                                        overflow: 'hidden'
-                                                    }}
-                                                >
+                                                <div className="relative w-full h-full">
                                                     <Image
                                                         src={layer.imageUrl}
                                                         alt={layer.name}
@@ -620,17 +720,99 @@ const Page = () => {
                                                         )}
                                                         style={{ 
                                                             opacity: layer.opacity,
-                                                            maxWidth: 'none',
-                                                            width: `${100 * (100 / layer.crop.width)}%`,
-                                                            height: `${100 * (100 / layer.crop.height)}%`,
+                                                            width: '100%',
+                                                            height: '100%',
                                                             objectFit: 'cover',
-                                                            position: 'absolute',
-                                                            left: `${-layer.crop.x * (100 / layer.crop.width)}%`,
-                                                            top: `${-layer.crop.y * (100 / layer.crop.height)}%`,
-                                                            transform: 'none'
+                                                            ...(selectedLayer !== layer.id && {
+                                                                clipPath: `inset(${layer.crop.y}% ${100 - (layer.crop.x + layer.crop.width)}% ${100 - (layer.crop.y + layer.crop.height)}% ${layer.crop.x}%)`
+                                                            })
                                                         }}
                                                         priority
                                                     />
+                                                    
+                                                    {selectedLayer === layer.id && (
+                                                        <>
+                                                            {/* Dark overlay for non-cropped area */}
+                                                            <div className="absolute inset-0">
+                                                                {/* Top overlay */}
+                                                                <div 
+                                                                    className="absolute bg-black/50"
+                                                                    style={{
+                                                                        left: '0',
+                                                                        top: '0',
+                                                                        width: '100%',
+                                                                        height: `${layer.crop.y}%`
+                                                                    }}
+                                                                />
+                                                                {/* Bottom overlay */}
+                                                                <div 
+                                                                    className="absolute bg-black/50"
+                                                                    style={{
+                                                                        left: '0',
+                                                                        top: `${layer.crop.y + layer.crop.height}%`,
+                                                                        width: '100%',
+                                                                        height: `${100 - (layer.crop.y + layer.crop.height)}%`
+                                                                    }}
+                                                                />
+                                                                {/* Left overlay */}
+                                                                <div 
+                                                                    className="absolute bg-black/50"
+                                                                    style={{
+                                                                        left: '0',
+                                                                        top: `${layer.crop.y}%`,
+                                                                        width: `${layer.crop.x}%`,
+                                                                        height: `${layer.crop.height}%`
+                                                                    }}
+                                                                />
+                                                                {/* Right overlay */}
+                                                                <div 
+                                                                    className="absolute bg-black/50"
+                                                                    style={{
+                                                                        left: `${layer.crop.x + layer.crop.width}%`,
+                                                                        top: `${layer.crop.y}%`,
+                                                                        width: `${100 - (layer.crop.x + layer.crop.width)}%`,
+                                                                        height: `${layer.crop.height}%`
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            
+                                                            {/* Crop border and handles */}
+                                                            <div 
+                                                                className="absolute border-2 border-white"
+                                                                style={{
+                                                                    top: `${layer.crop.y}%`,
+                                                                    left: `${layer.crop.x}%`,
+                                                                    width: `${layer.crop.width}%`,
+                                                                    height: `${layer.crop.height}%`,
+                                                                    pointerEvents: 'none'
+                                                                }}
+                                                            >
+                                                                {cropMode === 'free' && (
+                                                                    <>
+                                                                        {['nw', 'ne', 'se', 'sw'].map((handle) => (
+                                                                            <div
+                                                                                key={handle}
+                                                                                onMouseDown={(e) => handleCropResizeStart(e, handle)}
+                                                                                className={cn(
+                                                                                    "absolute w-4 h-4 bg-primary rounded-full border-2 border-white hover:scale-110 transition-transform cursor-pointer",
+                                                                                    {
+                                                                                        '-top-2 -left-2': handle === 'nw',
+                                                                                        '-top-2 -right-2': handle === 'ne',
+                                                                                        '-bottom-2 -right-2': handle === 'se',
+                                                                                        '-bottom-2 -left-2': handle === 'sw'
+                                                                                    }
+                                                                                )}
+                                                                                style={{
+                                                                                    pointerEvents: 'auto',
+                                                                                    cursor: `${handle}-resize`
+                                                                                }}
+                                                                            />
+                                                                        ))}
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         )
@@ -640,7 +822,7 @@ const Page = () => {
                                         <div
                                             key={textSet.id}
                                             className={cn(
-                                                "absolute cursor-move",
+                                                "absolute cursor-move whitespace-pre",
                                                 selectedLayer === textSet.id && "ring-2 ring-primary ring-offset-2"
                                             )}
                                             style={{
@@ -653,6 +835,7 @@ const Page = () => {
                                                 fontSize: `${textSet.fontSize}px`,
                                                 fontWeight: textSet.fontWeight,
                                                 opacity: textSet.opacity,
+                                                whiteSpace: 'pre',
                                                 zIndex: getLayerZIndex(
                                                     textSet.id, 
                                                     index, 
@@ -702,6 +885,8 @@ const Page = () => {
                                     onTextUpdate={handleTextUpdate}
                                     onAddText={addNewTextSet}
                                     onFileChange={handleFileChange}
+                                    cropMode={cropMode}
+                                    setCropMode={setCropMode}
                                 />
                             </div>
                         </div>

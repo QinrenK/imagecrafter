@@ -39,6 +39,8 @@ interface IntegratedPanelProps {
   onTextUpdate: (textId: string, updates: Partial<TextSet>) => void;
   onAddText: () => void;
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  cropMode: 'free' | 'fixed' | null;
+  setCropMode: (mode: 'free' | 'fixed' | null) => void;
 }
 
 export function IntegratedPanel({
@@ -47,7 +49,9 @@ export function IntegratedPanel({
   onImageUpdate,
   onTextUpdate,
   onAddText,
-  onFileChange
+  onFileChange,
+  cropMode,
+  setCropMode
 }: IntegratedPanelProps) {
   const selectedImage = layers.images.find(img => img.id === selectedLayer);
   const selectedText = layers.texts.find(text => text.id === selectedLayer);
@@ -90,6 +94,41 @@ export function IntegratedPanel({
     const rotationStep = 90;
     const newRotation = selectedImage.rotation + (direction === 'left' ? -rotationStep : rotationStep);
     onImageUpdate(selectedImage.id, { rotation: newRotation % 360 });
+  };
+
+  const handleCropAspectRatio = (ratio: number | null) => {
+    if (!selectedImage) return;
+    
+    if (ratio === null) {
+      setCropMode('free');
+      onImageUpdate(selectedImage.id, {
+        crop: {
+          ...selectedImage.crop,
+          aspect: undefined
+        }
+      });
+      return;
+    }
+
+    setCropMode('fixed');
+    
+    const imageAspectRatio = selectedImage.size.width / selectedImage.size.height;
+    let newCrop = { x: 0, y: 0, width: 100, height: 100 };
+
+    if (ratio > imageAspectRatio) {
+      newCrop.height = (imageAspectRatio / ratio) * 100;
+      newCrop.y = (100 - newCrop.height) / 2;
+    } else {
+      newCrop.width = (ratio / imageAspectRatio) * 100;
+      newCrop.x = (100 - newCrop.width) / 2;
+    }
+
+    onImageUpdate(selectedImage.id, {
+      crop: {
+        ...newCrop,
+        aspect: ratio
+      }
+    });
   };
 
   return (
@@ -216,137 +255,70 @@ export function IntegratedPanel({
                   </div>
                 </div>
 
-                {/* Add Crop Controls */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+                {/* Crop Controls */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
                     <Label>Crop</Label>
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => onImageUpdate(selectedImage.id, {
-                        crop: {
-                          x: 0,
-                          y: 0,
-                          width: 100,
-                          height: 100
-                        }
-                      })}
+                      onClick={() => handleCropAspectRatio(null)}
                     >
                       <ResetIcon className="h-4 w-4 mr-2" />
                       Reset Crop
                     </Button>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs">X Position (%)</Label>
-                        <Input
-                          type="number"
-                          value={Math.round(selectedImage.crop?.x || 0)}
-                          min={0}
-                          max={100}
-                          onChange={(e) => {
-                            const x = Number(e.target.value);
-                            if (x >= 0 && x <= 100) {
-                              onImageUpdate(selectedImage.id, {
-                                crop: { ...selectedImage.crop, x }
-                              });
-                            }
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Y Position (%)</Label>
-                        <Input
-                          type="number"
-                          value={Math.round(selectedImage.crop?.y || 0)}
-                          min={0}
-                          max={100}
-                          onChange={(e) => {
-                            const y = Number(e.target.value);
-                            if (y >= 0 && y <= 100) {
-                              onImageUpdate(selectedImage.id, {
-                                crop: { ...selectedImage.crop, y }
-                              });
-                            }
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs">Width (%)</Label>
-                        <Input
-                          type="number"
-                          value={Math.round(selectedImage.crop?.width || 100)}
-                          min={1}
-                          max={100}
-                          onChange={(e) => {
-                            const width = Number(e.target.value);
-                            if (width >= 1 && width <= 100) {
-                              onImageUpdate(selectedImage.id, {
-                                crop: { ...selectedImage.crop, width }
-                              });
-                            }
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Height (%)</Label>
-                        <Input
-                          type="number"
-                          value={Math.round(selectedImage.crop?.height || 100)}
-                          min={1}
-                          max={100}
-                          onChange={(e) => {
-                            const height = Number(e.target.value);
-                            if (height >= 1 && height <= 100) {
-                              onImageUpdate(selectedImage.id, {
-                                crop: { ...selectedImage.crop, height }
-                              });
-                            }
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => onImageUpdate(selectedImage.id, {
-                          crop: { ...selectedImage.crop, aspect: 1 }
-                        })}
-                      >
-                        <AspectRatioIcon className="h-4 w-4 mr-2" />
-                        1:1
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => onImageUpdate(selectedImage.id, {
-                          crop: { ...selectedImage.crop, aspect: 16/9 }
-                        })}
-                      >
-                        <AspectRatioIcon className="h-4 w-4 mr-2" />
-                        16:9
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => onImageUpdate(selectedImage.id, {
-                          crop: { ...selectedImage.crop, aspect: 4/3 }
-                        })}
-                      >
-                        <AspectRatioIcon className="h-4 w-4 mr-2" />
-                        4:3
-                      </Button>
-                    </div>
+                  {/* Replace the manual input boxes with just the aspect ratio buttons */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button
+                      variant={selectedImage?.crop.aspect === 1 ? "default" : "outline"}
+                      size="sm"
+                      className="w-full"
+                      onClick={() => handleCropAspectRatio(1)}
+                    >
+                      1:1
+                    </Button>
+                    <Button
+                      variant={selectedImage?.crop.aspect === 16/9 ? "default" : "outline"}
+                      size="sm"
+                      className="w-full"
+                      onClick={() => handleCropAspectRatio(16/9)}
+                    >
+                      16:9
+                    </Button>
+                    <Button
+                      variant={selectedImage?.crop.aspect === 4/3 ? "default" : "outline"}
+                      size="sm"
+                      className="w-full"
+                      onClick={() => handleCropAspectRatio(4/3)}
+                    >
+                      4:3
+                    </Button>
+                    <Button
+                      variant={selectedImage?.crop.aspect === 3/4 ? "default" : "outline"}
+                      size="sm"
+                      className="w-full"
+                      onClick={() => handleCropAspectRatio(3/4)}
+                    >
+                      3:4
+                    </Button>
+                    <Button
+                      variant={selectedImage?.crop.aspect === 9/16 ? "default" : "outline"}
+                      size="sm"
+                      className="w-full"
+                      onClick={() => handleCropAspectRatio(9/16)}
+                    >
+                      9:16
+                    </Button>
+                    <Button
+                      variant={!selectedImage?.crop.aspect ? "default" : "outline"}
+                      size="sm"
+                      className="w-full"
+                      onClick={() => handleCropAspectRatio(null)}
+                    >
+                      Free
+                    </Button>
                   </div>
                 </div>
 
@@ -426,7 +398,11 @@ export function IntegratedPanel({
                   attribute="text"
                   label="Text"
                   currentValue={selectedText.text}
-                  handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
+                  handleAttributeChange={(attribute, value) => {
+                    const processedValue = value.replace(/\r\n/g, '\n');
+                    onTextUpdate(selectedText.id, { [attribute]: processedValue });
+                  }}
+                  multiline
                 />
 
                 <FontFamilyPicker

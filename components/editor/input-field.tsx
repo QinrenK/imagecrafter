@@ -9,33 +9,40 @@ interface InputFieldProps {
   label: string;
   currentValue: string;
   handleAttributeChange: (attribute: string, value: string) => void;
+  multiline?: boolean;
 }
 
-const InputField: React.FC<InputFieldProps> = ({
+export function InputField({
   attribute,
   label,
   currentValue,
-  handleAttributeChange
-}) => {
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    handleAttributeChange(attribute, value);
-  };
-
+  handleAttributeChange,
+  multiline
+}: InputFieldProps) {
   return (
-    <>
-      <div className="flex flex-col items-start">
-        {/* <Label htmlFor={attribute}>{label}</Label> */}
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      {multiline ? (
+        <textarea
+          className="w-full min-h-[80px] px-3 py-2 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          value={currentValue}
+          onChange={(e) => handleAttributeChange(attribute, e.target.value)}
+          onKeyDown={(e) => {
+            // Allow only intentional line breaks with Shift+Enter or Enter
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault(); // Prevent default line break on single Enter
+            }
+          }}
+        />
+      ) : (
         <Input
           type="text"
-          placeholder='text'
           value={currentValue}
-          onChange={handleInputChange}
-          className='mt-2'
+          onChange={(e) => handleAttributeChange(attribute, e.target.value)}
         />
-      </div>
-    </>
+      )}
+    </div>
   );
-};
+}
 
 export default InputField;
