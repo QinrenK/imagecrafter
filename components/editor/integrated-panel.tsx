@@ -19,7 +19,6 @@ import {
   FontFamilyIcon,
   EyeOpenIcon,
   EyeClosedIcon,
-  ResetIcon,
   CropIcon,
   AspectRatioIcon,
   PlusIcon
@@ -101,12 +100,6 @@ export function IntegratedPanel({
     
     if (ratio === null) {
       setCropMode('free');
-      onImageUpdate(selectedImage.id, {
-        crop: {
-          ...selectedImage.crop,
-          aspect: undefined
-        }
-      });
       return;
     }
 
@@ -256,68 +249,56 @@ export function IntegratedPanel({
                 </div>
 
                 {/* Crop Controls */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <Label>Crop</Label>
-                    <Button 
-                      variant="outline" 
+                <div className="space-y-2">
+                  <Label>Crop</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant={cropMode === 'free' ? "default" : "outline"}
                       size="sm"
                       onClick={() => handleCropAspectRatio(null)}
                     >
-                      <ResetIcon className="h-4 w-4 mr-2" />
-                      Reset Crop
+                      <CropIcon className="mr-2 h-4 w-4" />
+                      Free
                     </Button>
-                  </div>
-
-                  {/* Replace the manual input boxes with just the aspect ratio buttons */}
-                  <div className="grid grid-cols-3 gap-2">
                     <Button
-                      variant={selectedImage?.crop.aspect === 1 ? "default" : "outline"}
+                      variant={cropMode === 'fixed' && selectedImage.crop.aspect === 1 ? "default" : "outline"}
                       size="sm"
-                      className="w-full"
                       onClick={() => handleCropAspectRatio(1)}
                     >
+                      <AspectRatioIcon className="mr-2 h-4 w-4" />
                       1:1
                     </Button>
                     <Button
-                      variant={selectedImage?.crop.aspect === 16/9 ? "default" : "outline"}
+                      variant={cropMode === 'fixed' && selectedImage.crop.aspect === 16/9 ? "default" : "outline"}
                       size="sm"
-                      className="w-full"
                       onClick={() => handleCropAspectRatio(16/9)}
                     >
+                      <AspectRatioIcon className="mr-2 h-4 w-4" />
                       16:9
                     </Button>
                     <Button
-                      variant={selectedImage?.crop.aspect === 4/3 ? "default" : "outline"}
+                      variant={cropMode === 'fixed' && selectedImage.crop.aspect === 4/3 ? "default" : "outline"}
                       size="sm"
-                      className="w-full"
                       onClick={() => handleCropAspectRatio(4/3)}
                     >
+                      <AspectRatioIcon className="mr-2 h-4 w-4" />
                       4:3
                     </Button>
                     <Button
-                      variant={selectedImage?.crop.aspect === 3/4 ? "default" : "outline"}
+                      variant={cropMode === 'fixed' && selectedImage.crop.aspect === 3/2 ? "default" : "outline"}
                       size="sm"
-                      className="w-full"
-                      onClick={() => handleCropAspectRatio(3/4)}
+                      onClick={() => handleCropAspectRatio(3/2)}
                     >
-                      3:4
+                      <AspectRatioIcon className="mr-2 h-4 w-4" />
+                      3:2
                     </Button>
                     <Button
-                      variant={selectedImage?.crop.aspect === 9/16 ? "default" : "outline"}
+                      variant={cropMode === 'fixed' && selectedImage.crop.aspect === 9/16 ? "default" : "outline"}
                       size="sm"
-                      className="w-full"
                       onClick={() => handleCropAspectRatio(9/16)}
                     >
+                      <AspectRatioIcon className="mr-2 h-4 w-4" />
                       9:16
-                    </Button>
-                    <Button
-                      variant={!selectedImage?.crop.aspect ? "default" : "outline"}
-                      size="sm"
-                      className="w-full"
-                      onClick={() => handleCropAspectRatio(null)}
-                    >
-                      Free
                     </Button>
                   </div>
                 </div>
@@ -359,7 +340,7 @@ export function IntegratedPanel({
                     }
                   })}
                 >
-                  <ResetIcon className="mr-2 h-4 w-4" />
+                  <ReloadIcon className="mr-2 h-4 w-4" />
                   Reset Transform
                 </Button>
               </div>

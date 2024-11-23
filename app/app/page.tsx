@@ -99,6 +99,7 @@ const Page = () => {
     const [isLayersPanelOpen, setIsLayersPanelOpen] = useState(true);
     const [isIntegratedPanelOpen, setIsIntegratedPanelOpen] = useState(true);
     const [cropMode, setCropMode] = useState<'free' | 'fixed' | null>(null);
+    const [originalDimensions, setOriginalDimensions] = useState<Map<string, { width: number; height: number }>>(new Map());
 
     useEffect(() => {
         const updateDimensions = () => {
@@ -196,6 +197,16 @@ const Page = () => {
                 } finally {
                     setIsProcessing(false);
                 }
+
+                // Store original dimensions
+                setOriginalDimensions(prev => {
+                    const newMap = new Map(prev);
+                    newMap.set(newImageId, {
+                        width: img.width,
+                        height: img.height
+                    });
+                    return newMap;
+                });
             };
 
             img.src = imageUrl;
@@ -477,19 +488,12 @@ const Page = () => {
         if (!layer) return;
 
         if (ratio === null) {
-            // Reset to full image but keep current position and size
-            handleImageUpdate(layer.id, {
-                crop: {
-                    x: 0,
-                    y: 0,
-                    width: 100,
-                    height: 100,
-                    aspect: undefined
-                }
-            });
+            setCropMode('free');
             return;
         }
 
+        setCropMode('fixed');
+        
         // Calculate new crop dimensions while maintaining aspect ratio
         const imageAspectRatio = layer.size.width / layer.size.height;
         let newCrop = { x: 0, y: 0, width: 100, height: 100 };
