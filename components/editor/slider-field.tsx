@@ -13,48 +13,98 @@ interface SliderFieldProps {
   step: number;
   currentValue: number;
   handleAttributeChange: (attribute: string, value: number) => void;
+  allowEmpty?: boolean;
 }
 
-const SliderField: React.FC<SliderFieldProps> = ({
-    attribute,
-    label,
-    min,
-    max,
-    step,
-    currentValue,
-    handleAttributeChange
-  }) => { 
-    const handleSliderInputFieldChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const value = parseFloat(event.target.value);
-      handleAttributeChange(attribute, value);
-    };
-  
-    return (
-      <>
-        <div className="flex items-center justify-between mt-8">
-          <Label htmlFor={attribute}>{label}</Label>
-          <Input
-            type="text"
-            value={currentValue}
-            onChange={handleSliderInputFieldChange}
-            className="w-12 rounded-md border border-transparent px-2 py-0.5 text-center text-sm text-muted-foreground hover:border-border hover:text-foreground hover:animate-pulse"
-            min={min}
-            max={max}
-            step={step}
-          />
-        </div>
-        <Slider
-          id={attribute}
-          min={min}
-          max={max}
-          value={[currentValue]}
-          step={step}
-          onValueChange={(value) => handleAttributeChange(attribute, value[0])}
-          className="[&_[role=slider]]:h-4 [&_[role=slider]]:w-4 mt-2"
-          aria-label={label}
+const SliderField = ({
+  attribute,
+  label,
+  min,
+  max,
+  step,
+  currentValue,
+  handleAttributeChange,
+  allowEmpty = true
+}: SliderFieldProps) => {
+  const [inputValue, setInputValue] = React.useState<string>(currentValue.toString());
+  const [isDirty, setIsDirty] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isDirty) {
+      setInputValue(currentValue.toString());
+    }
+  }, [currentValue, isDirty]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+    setIsDirty(true);
+    
+    if (value === '' && allowEmpty) {
+      return;
+    }
+
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue)) {
+      handleAttributeChange(attribute, numValue);
+    }
+  };
+
+  const handleInputBlur = () => {
+    setIsDirty(false);
+    
+    if (inputValue === '') {
+      if (allowEmpty) {
+        handleAttributeChange(attribute, min);
+      }
+      setInputValue(min.toString());
+      return;
+    }
+
+    let numValue = parseFloat(inputValue);
+    if (isNaN(numValue)) {
+      numValue = min;
+    }
+
+    // Clamp value between min and max
+    numValue = Math.max(min, Math.min(max, numValue));
+    setInputValue(numValue.toString());
+    handleAttributeChange(attribute, numValue);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">{label}</Label>
+        <Input
+          type="text"
+          inputMode="numeric"
+          value={inputValue}
+          onChange={handleInputChange}
+          onBlur={handleInputBlur}
+          onKeyDown={handleKeyDown}
+          className="w-20 text-right font-sans"
         />
-      </>
-    );
+      </div>
+      <Slider
+        value={[parseFloat(inputValue) || min]}
+        min={min}
+        max={max}
+        step={step}
+        onValueChange={([value]) => {
+          setIsDirty(false);
+          setInputValue(value.toString());
+          handleAttributeChange(attribute, value);
+        }}
+      />
+    </div>
+  );
 };
 
-export default SliderField
+export default SliderField;
