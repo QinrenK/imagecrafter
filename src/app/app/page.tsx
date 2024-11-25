@@ -30,7 +30,7 @@ const Page = () => {
         <>
             {/* Existing JSX code */}
             <Button onClick={handleSaveImageClick}>
-                Save image
+                Save Image
             </Button>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

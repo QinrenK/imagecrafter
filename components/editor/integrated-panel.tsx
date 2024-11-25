@@ -56,6 +56,7 @@ export function IntegratedPanel({
   const selectedText = layers.texts.find(text => text.id === selectedLayer);
   
   const [activeTab, setActiveTab] = React.useState<string>("transform");
+  const [selectedTool, setSelectedTool] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (selectedLayer) {
@@ -167,6 +168,30 @@ export function IntegratedPanel({
     setCropMode(null);
   };
 
+  const handleToolClick = (toolName: string) => {
+    // If the tool is already selected, deselect it
+    if (selectedTool === toolName) {
+        setSelectedTool(null);
+        // Reset crop mode if it's a crop tool
+        if (toolName.startsWith('crop-')) {
+            setCropMode(null);
+        }
+    } else {
+        // Select the new tool
+        setSelectedTool(toolName);
+        // Handle specific tool actions
+        if (toolName.startsWith('crop-')) {
+            const ratio = toolName === 'crop-free' ? null : 
+                toolName === 'crop-1:1' ? 1 :
+                toolName === 'crop-16:9' ? 16/9 :
+                toolName === 'crop-4:3' ? 4/3 :
+                toolName === 'crop-3:2' ? 3/2 :
+                toolName === 'crop-9:16' ? 9/16 : null;
+            handleCropAspectRatio(ratio);
+        }
+    }
+  };
+
   return (
     <Card className="h-full p-4 overflow-hidden">
       <Tabs 
@@ -198,17 +223,45 @@ export function IntegratedPanel({
                   <Label>Position</Label>
                   <div className="grid grid-cols-3 gap-2 place-items-center">
                     <div />
-                    <Button variant="outline" size="icon" onClick={() => handleMove('up')}>
+                    <Button 
+                      variant={selectedTool === 'move-up' ? "default" : "outline"}
+                      size="icon" 
+                      onClick={() => {
+                        handleToolClick('move-up');
+                        handleMove('up');
+                      }}
+                    >
                       <ArrowUpIcon className="h-4 w-4" />
                     </Button>
                     <div />
-                    <Button variant="outline" size="icon" onClick={() => handleMove('left')}>
+                    <Button 
+                      variant={selectedTool === 'move-left' ? "default" : "outline"}
+                      size="icon" 
+                      onClick={() => {
+                        handleToolClick('move-left');
+                        handleMove('left');
+                      }}
+                    >
                       <ArrowLeftIcon className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="icon" onClick={() => handleMove('down')}>
+                    <Button 
+                      variant={selectedTool === 'move-down' ? "default" : "outline"}
+                      size="icon" 
+                      onClick={() => {
+                        handleToolClick('move-down');
+                        handleMove('down');
+                      }}
+                    >
                       <ArrowDownIcon className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="icon" onClick={() => handleMove('right')}>
+                    <Button 
+                      variant={selectedTool === 'move-right' ? "default" : "outline"}
+                      size="icon" 
+                      onClick={() => {
+                        handleToolClick('move-right');
+                        handleMove('right');
+                      }}
+                    >
                       <ArrowRightIcon className="h-4 w-4" />
                     </Button>
                   </div>
@@ -296,49 +349,49 @@ export function IntegratedPanel({
                   <Label>Crop</Label>
                   <div className="flex flex-wrap gap-2">
                     <Button
-                      variant={cropMode === 'free' ? "default" : "outline"}
+                      variant={selectedTool === 'crop-free' ? "default" : "outline"}
                       size="sm"
-                      onClick={() => handleCropAspectRatio(null)}
+                      onClick={() => handleToolClick('crop-free')}
                     >
                       <CropIcon className="mr-2 h-4 w-4" />
                       Free
                     </Button>
                     <Button
-                      variant={cropMode === 'fixed' && selectedImage.crop.aspect === 1 ? "default" : "outline"}
+                      variant={selectedTool === 'crop-1:1' ? "default" : "outline"}
                       size="sm"
-                      onClick={() => handleCropAspectRatio(1)}
+                      onClick={() => handleToolClick('crop-1:1')}
                     >
                       <AspectRatioIcon className="mr-2 h-4 w-4" />
                       1:1
                     </Button>
                     <Button
-                      variant={cropMode === 'fixed' && selectedImage.crop.aspect === 16/9 ? "default" : "outline"}
+                      variant={selectedTool === 'crop-16:9' ? "default" : "outline"}
                       size="sm"
-                      onClick={() => handleCropAspectRatio(16/9)}
+                      onClick={() => handleToolClick('crop-16:9')}
                     >
                       <AspectRatioIcon className="mr-2 h-4 w-4" />
                       16:9
                     </Button>
                     <Button
-                      variant={cropMode === 'fixed' && selectedImage.crop.aspect === 4/3 ? "default" : "outline"}
+                      variant={selectedTool === 'crop-4:3' ? "default" : "outline"}
                       size="sm"
-                      onClick={() => handleCropAspectRatio(4/3)}
+                      onClick={() => handleToolClick('crop-4:3')}
                     >
                       <AspectRatioIcon className="mr-2 h-4 w-4" />
                       4:3
                     </Button>
                     <Button
-                      variant={cropMode === 'fixed' && selectedImage.crop.aspect === 3/2 ? "default" : "outline"}
+                      variant={selectedTool === 'crop-3:2' ? "default" : "outline"}
                       size="sm"
-                      onClick={() => handleCropAspectRatio(3/2)}
+                      onClick={() => handleToolClick('crop-3:2')}
                     >
                       <AspectRatioIcon className="mr-2 h-4 w-4" />
                       3:2
                     </Button>
                     <Button
-                      variant={cropMode === 'fixed' && selectedImage.crop.aspect === 9/16 ? "default" : "outline"}
+                      variant={selectedTool === 'crop-9:16' ? "default" : "outline"}
                       size="sm"
-                      onClick={() => handleCropAspectRatio(9/16)}
+                      onClick={() => handleToolClick('crop-9:16')}
                     >
                       <AspectRatioIcon className="mr-2 h-4 w-4" />
                       9:16
@@ -351,17 +404,23 @@ export function IntegratedPanel({
                   <Label>Rotation</Label>
                   <div className="flex gap-2">
                     <Button 
-                      variant="outline" 
+                      variant={selectedTool === 'rotate-left' ? "default" : "outline"}
                       size="icon" 
-                      onClick={() => handleRotate('left')}
+                      onClick={() => {
+                        handleToolClick('rotate-left');
+                        handleRotate('left');
+                      }}
                       title="Rotate Left"
                     >
                       <RotateCounterClockwiseIcon className="h-4 w-4" />
                     </Button>
                     <Button 
-                      variant="outline" 
+                      variant={selectedTool === 'rotate-right' ? "default" : "outline"}
                       size="icon" 
-                      onClick={() => handleRotate('right')}
+                      onClick={() => {
+                        handleToolClick('rotate-right');
+                        handleRotate('right');
+                      }}
                       title="Rotate Right"
                     >
                       <RotateCounterClockwiseIcon className="h-4 w-4 transform scale-x-[-1]" />

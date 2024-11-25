@@ -654,7 +654,7 @@ const Page = () => {
                                 accept=".jpg, .jpeg, .png"
                             />
                             <Button onClick={handleUploadImage}>
-                                Upload image
+                                Upload Image
                             </Button>
                             <Button 
                                 onClick={() => setIsDialogOpen(true)}
@@ -667,7 +667,7 @@ const Page = () => {
                                         Saving...
                                     </>
                                 ) : (
-                                    'Save image'
+                                    'Save Image'
                                 )}
                             </Button>
                             <ModeToggle />
