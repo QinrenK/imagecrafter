@@ -23,6 +23,7 @@ import { IntegratedPanel } from '@/components/editor/integrated-panel';
 import { ResizableImage } from '@/components/editor/resizable-image';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent } from "@/components/ui/dropdown-menu"
 import { LayerItem } from "@/components/editor/layer-item";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 
 interface TextSet {
     id: string;
@@ -100,6 +101,8 @@ const Page = () => {
     const [isIntegratedPanelOpen, setIsIntegratedPanelOpen] = useState(true);
     const [cropMode, setCropMode] = useState<'free' | 'fixed' | null>(null);
     const [originalDimensions, setOriginalDimensions] = useState<Map<string, { width: number; height: number }>>(new Map());
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [selectedResolution, setSelectedResolution] = useState<string | null>(null);
 
     useEffect(() => {
         const updateDimensions = () => {
@@ -246,132 +249,151 @@ const Page = () => {
         setTextSets(prev => prev.filter(set => set.id !== id));
     };
 
-    const saveCompositeImage = () => {
-        if (!canvasRef.current) {
-            console.error('Canvas reference not found');
-            return;
+    const getResolutionDimensions = (resolution: string): { width: number; height: number } => {
+        switch (resolution) {
+            case '720p':
+                return { width: 1280, height: 720 };
+            case 'HD':
+                return { width: 1920, height: 1080 };
+            case '4K':
+                return { width: 3840, height: 2160 };
+            default:
+                const previewContainer = document.querySelector('.relative.w-full.h-[calc(100vh-12rem)]');
+                if (!previewContainer) {
+                    return { width: 1920, height: 1080 }; // Default to HD if container not found
+                }
+                const rect = previewContainer.getBoundingClientRect();
+                return { width: rect.width, height: rect.height };
         }
+    };
+
+    const saveCompositeImage = async (resolution: string) => {
+        if (!canvasRef.current) return;
 
         try {
             setIsProcessing(true);
             const canvas = canvasRef.current;
             const ctx = canvas.getContext('2d');
             if (!ctx) {
-                console.error('Could not get canvas context');
-                return;
+                throw new Error('Could not get canvas context');
             }
 
-            // Set canvas size to match the container
-            const containerWidth = window.innerWidth * 0.6;
-            const containerHeight = window.innerHeight * 0.6;
-            canvas.width = containerWidth;
-            canvas.height = containerHeight;
+            // Set canvas size based on selected resolution
+            const dimensions = getResolutionDimensions(resolution);
+            canvas.width = dimensions.width;
+            canvas.height = dimensions.height;
 
-            // Clear canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Clear canvas and set white background
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Create a promise to handle image loading
-            const loadImage = (url: string): Promise<HTMLImageElement> => {
-                return new Promise((resolve, reject) => {
-                    const img = document.createElement('img');
-                    img.crossOrigin = "anonymous";
-                    img.onload = () => resolve(img);
-                    img.onerror = (e) => reject(e);
-                    img.src = url;
-                });
-            };
+            // Get all visible layers (both images and text) and sort by z-index
+            const allLayers = [
+                ...layers.images.map(layer => ({
+                    ...layer,
+                    type: 'image' as const
+                })),
+                ...textSets.map(text => ({
+                    ...text,
+                    type: 'text' as const
+                }))
+            ].filter(layer => 
+                layer.type === 'text' || (layer.type === 'image' && layer.isVisible)
+            ).sort((a, b) => {
+                const aIndex = layerHistory.indexOf(a.id);
+                const bIndex = layerHistory.indexOf(b.id);
+                // If layer is not in history, put it at the bottom
+                return (aIndex === -1 ? Infinity : aIndex) - (bIndex === -1 ? Infinity : bIndex);
+            });
 
-            // Compose the image
-            const composeImage = async () => {
-                try {
-                    // Draw white background
-                    ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Draw each layer in order
+            for (const layer of allLayers) {
+                if (layer.type === 'image') {
+                    try {
+                        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+                            const image = document.createElement('img');
+                            image.crossOrigin = "anonymous";
+                            image.onload = () => resolve(image);
+                            image.onerror = reject;
+                            image.src = layer.imageUrl;
+                        });
 
-                    // Draw images
-                    for (const layer of [...layers.images].reverse()) {
-                        if (!layer.isVisible) continue;
-
-                        try {
-                            const img = await loadImage(layer.imageUrl);
-                            
-                            ctx.save();
-                            
-                            // Apply transformations
-                            ctx.globalAlpha = layer.opacity;
-                            
-                            // Calculate center position
-                            const x = (layer.position.x / 100) * canvas.width;
-                            const y = (layer.position.y / 100) * canvas.height;
-                            
-                            // Move to position, rotate, then draw
-                            ctx.translate(x, y);
-                            ctx.rotate((layer.rotation * Math.PI) / 180);
-                            
-                            // Draw image centered at transformed position
-                            ctx.drawImage(
-                                img,
-                                -layer.size.width / 2,
-                                -layer.size.height / 2,
-                                layer.size.width,
-                                layer.size.height
-                            );
-                            
-                            ctx.restore();
-                        } catch (error) {
-                            console.error(`Failed to load image for layer ${layer.id}:`, error);
-                        }
-                    }
-
-                    // Draw text layers
-                    textSets.forEach(textSet => {
                         ctx.save();
                         
-                        // Configure text properties
-                        ctx.font = `${textSet.fontWeight} ${textSet.fontSize}px ${textSet.fontFamily}`;
-                        ctx.fillStyle = textSet.color;
-                        ctx.globalAlpha = textSet.opacity;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-
-                        // Calculate position
-                        const x = canvas.width * (textSet.position.x / 100);
-                        const y = canvas.height * (textSet.position.y / 100);
-
-                        // Apply rotation
-                        ctx.translate(x, y);
-                        ctx.rotate((textSet.rotation * Math.PI) / 180);
+                        // Scale positions and sizes based on new resolution
+                        const scaleX = canvas.width / canvasDimensions.width;
+                        const scaleY = canvas.height / canvasDimensions.height;
                         
-                        // Draw text
-                        ctx.fillText(textSet.text, 0, 0);
+                        const x = (layer.position.x / 100) * canvas.width;
+                        const y = (layer.position.y / 100) * canvas.height;
+                        
+                        ctx.translate(x, y);
+                        ctx.rotate((layer.rotation * Math.PI) / 180);
+                        ctx.globalAlpha = layer.opacity;
+
+                        // Calculate source (crop) dimensions
+                        const sourceWidth = img.width;
+                        const sourceHeight = img.height;
+                        const cropX = (layer.crop.x / 100) * sourceWidth;
+                        const cropY = (layer.crop.y / 100) * sourceHeight;
+                        const cropWidth = (layer.crop.width / 100) * sourceWidth;
+                        const cropHeight = (layer.crop.height / 100) * sourceHeight;
+
+                        // Scale the destination size
+                        const scaledWidth = layer.size.width * scaleX;
+                        const scaledHeight = layer.size.height * scaleY;
+
+                        ctx.drawImage(
+                            img,
+                            cropX, cropY, cropWidth, cropHeight,
+                            -scaledWidth / 2, -scaledHeight / 2,
+                            scaledWidth, scaledHeight
+                        );
+
                         ctx.restore();
-                    });
-
-                    // Convert to PNG and download
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                    const dataUrl = canvas.toDataURL('image/png', 1.0);
+                    } catch (error) {
+                        console.error(`Error drawing image layer ${layer.id}:`, error);
+                    }
+                } else {
+                    // Draw text layer
+                    ctx.save();
                     
-                    // Create and trigger download
-                    const link = document.createElement('a');
-                    link.download = `imagecrafter-${timestamp}.png`;
-                    link.href = dataUrl;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                    const scaleFactor = Math.min(
+                        canvas.width / canvasDimensions.width,
+                        canvas.height / canvasDimensions.height
+                    );
+                    
+                    const scaledFontSize = layer.fontSize * scaleFactor;
+                    
+                    ctx.font = `${layer.fontWeight} ${scaledFontSize}px ${layer.fontFamily}`;
+                    ctx.fillStyle = layer.color;
+                    ctx.globalAlpha = layer.opacity;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
 
-                } catch (error) {
-                    console.error('Error composing image:', error);
-                    throw error;
+                    const x = (layer.position.x / 100) * canvas.width;
+                    const y = (layer.position.y / 100) * canvas.height;
+
+                    ctx.translate(x, y);
+                    ctx.rotate((layer.rotation * Math.PI) / 180);
+                    
+                    ctx.fillText(layer.text, 0, 0);
+                    ctx.restore();
                 }
-            };
+            }
 
-            // Execute composition
-            composeImage().finally(() => {
-                setIsProcessing(false);
-            });
+            // Convert to PNG and download
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const dataUrl = canvas.toDataURL('image/png', 1.0);
+            
+            const link = document.createElement('a');
+            link.download = `imagecrafter-${resolution}-${timestamp}.png`;
+            link.href = dataUrl;
+            link.click();
 
         } catch (error) {
             console.error('Error saving image:', error);
+        } finally {
             setIsProcessing(false);
         }
     };
@@ -575,6 +597,13 @@ const Page = () => {
         }));
     }, [textSets]);
 
+    // Add this function to handle resolution selection
+    const handleResolutionSelect = (resolution: string) => {
+        setSelectedResolution(resolution);
+        setIsDialogOpen(false);
+        saveCompositeImage(resolution);
+    };
+
     return (
         <>
             {user && session && session.user ? (
@@ -595,8 +624,8 @@ const Page = () => {
                                 Upload image
                             </Button>
                             <Button 
-                                onClick={saveCompositeImage}
-                                disabled={!layers.images.length}
+                                onClick={() => setIsDialogOpen(true)}
+                                disabled={isProcessing || layers.images.length === 0}
                                 className="w-fit"
                             >
                                 {isProcessing ? (
@@ -963,6 +992,23 @@ const Page = () => {
                 width={canvasDimensions.width}
                 height={canvasDimensions.height}
             />
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Select Resolution</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col space-y-2">
+                        <Button onClick={() => handleResolutionSelect('720p')}>720p (1280×720)</Button>
+                        <Button onClick={() => handleResolutionSelect('HD')}>HD (1920×1080)</Button>
+                        <Button onClick={() => handleResolutionSelect('4K')}>4K (3840×2160)</Button>
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
