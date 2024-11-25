@@ -284,145 +284,131 @@ const Page = () => {
 
     const saveCompositeImage = async (resolution: string) => {
         if (!canvasRef.current) return;
+        setIsProcessing(true);
 
         try {
-            setIsProcessing(true);
             const canvas = canvasRef.current;
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
 
-            // Get target dimensions based on selected resolution
-            const targetDimensions = getResolutionDimensions(resolution);
-            
-            // Set canvas size to match target resolution
-            canvas.width = targetDimensions.width;
-            canvas.height = targetDimensions.height;
+            // Get target dimensions and set canvas size
+            const targetDims = getResolutionDimensions(resolution);
+            canvas.width = targetDims.width;
+            canvas.height = targetDims.height;
 
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#000000'; // Set background color
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Calculate scale factors for the new resolution
-            const scaleX = targetDimensions.width / canvasDimensions.width;
-            const scaleY = targetDimensions.height / canvasDimensions.height;
-
-            // Sort layers by z-index
-            const allLayers = [...layers.images, ...textSets.map(text => ({
-                ...text,
-                type: 'text' as const
-            }))].sort((a, b) => {
+            // Sort layers by z-index before drawing
+            const sortedLayers = [...layers.images].sort((a, b) => {
                 const aIndex = layerHistory.indexOf(a.id);
                 const bIndex = layerHistory.indexOf(b.id);
                 return aIndex - bIndex;
             });
 
-            // Draw each layer while maintaining aspect ratio
-            for (const layer of allLayers) {
-                if ('imageUrl' in layer && layer.isVisible) {
+            // Draw each visible image layer
+            for (const layer of sortedLayers) {
+                if (!layer.isVisible) continue;
+
+                await new Promise<void>((resolve, reject) => {
                     const img = document.createElement('img');
                     img.crossOrigin = "anonymous";
                     img.src = layer.imageUrl;
                     
-                    await new Promise<void>((resolve) => {
-                        img.onload = () => {
-                            // Scale dimensions and positions
-                            const scaledWidth = layer.size.width * scaleX;
-                            const scaledHeight = layer.size.height * scaleY;
-                            const scaledX = (layer.position.x / 100) * targetDimensions.width;
-                            const scaledY = (layer.position.y / 100) * targetDimensions.height;
+                    img.onload = () => {
+                        // Calculate crop dimensions in pixels
+                        const cropX = (layer.crop.x / 100) * layer.originalDimensions.width;
+                        const cropY = (layer.crop.y / 100) * layer.originalDimensions.height;
+                        const cropWidth = (layer.crop.width / 100) * layer.originalDimensions.width;
+                        const cropHeight = (layer.crop.height / 100) * layer.originalDimensions.height;
 
-                            // Create temporary canvas for cropping
-                            const tempCanvas = document.createElement('canvas');
-                            const tempCtx = tempCanvas.getContext('2d');
-                            if (!tempCtx) {
-                                resolve();
-                                return;
-                            }
+                        // Calculate scaled dimensions for the canvas
+                        const scaledWidth = (cropWidth / layer.originalDimensions.width) * layer.size.width;
+                        const scaledHeight = (cropHeight / layer.originalDimensions.height) * layer.size.height;
 
-                            // Set temp canvas size
-                            tempCanvas.width = scaledWidth;
-                            tempCanvas.height = scaledHeight;
+                        // Calculate position relative to canvas dimensions
+                        const canvasX = (layer.position.x / 100) * canvas.width;
+                        const canvasY = (layer.position.y / 100) * canvas.height;
 
-                            // Draw image maintaining aspect ratio
-                            tempCtx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+                        ctx.save();
+                        ctx.globalAlpha = layer.opacity;
 
-                            // Apply crop if needed
-                            const cropX = (layer.crop.x / 100) * scaledWidth;
-                            const cropY = (layer.crop.y / 100) * scaledHeight;
-                            const cropWidth = (layer.crop.width / 100) * scaledWidth;
-                            const cropHeight = (layer.crop.height / 100) * scaledHeight;
+                        // Move to the position
+                        ctx.translate(canvasX, canvasY);
+                        ctx.rotate((layer.rotation * Math.PI) / 180);
 
-                            // Create another temp canvas for the cropped result
-                            const croppedCanvas = document.createElement('canvas');
-                            const croppedCtx = croppedCanvas.getContext('2d');
-                            if (!croppedCtx) {
-                                resolve();
-                                return;
-                            }
+                        // Draw the image with proper scaling
+                        ctx.drawImage(
+                            img,
+                            cropX,
+                            cropY,
+                            cropWidth,
+                            cropHeight,
+                            -scaledWidth / 2,
+                            -scaledHeight / 2,
+                            scaledWidth,
+                            scaledHeight
+                        );
 
-                            croppedCanvas.width = cropWidth;
-                            croppedCanvas.height = cropHeight;
+                        ctx.restore();
+                        resolve();
+                    };
 
-                            // Draw the cropped portion
-                            croppedCtx.drawImage(
-                                tempCanvas,
-                                cropX, cropY, cropWidth, cropHeight,
-                                0, 0, cropWidth, cropHeight
-                            );
-
-                            // Draw to main canvas with rotation and opacity
-                            ctx.save();
-                            ctx.globalAlpha = layer.opacity;
-                            ctx.translate(scaledX, scaledY);
-                            ctx.rotate((layer.rotation * Math.PI) / 180);
-                            ctx.drawImage(
-                                croppedCanvas,
-                                -cropWidth / 2,
-                                -cropHeight / 2,
-                                cropWidth,
-                                cropHeight
-                            );
-                            ctx.restore();
-                            resolve();
-                        };
-                        img.onerror = () => {
-                            console.error('Error loading image:', layer.imageUrl);
-                            resolve();
-                        };
-                    });
-                } else if (!('imageUrl' in layer)) {
-                    // Handle text layers
-                    const textLayer = layer as TextSet;
-                    const scaledX = (textLayer.position.x / 100) * targetDimensions.width;
-                    const scaledY = (textLayer.position.y / 100) * targetDimensions.height;
-                    const scaledFontSize = textLayer.fontSize * scaleX;
-
-                    ctx.save();
-                    ctx.globalAlpha = textLayer.opacity;
-                    ctx.translate(scaledX, scaledY);
-                    ctx.rotate((textLayer.rotation * Math.PI) / 180);
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillStyle = textLayer.color;
-                    ctx.font = `${textLayer.fontWeight} ${scaledFontSize}px ${textLayer.fontFamily}`;
-                    ctx.fillText(textLayer.text, 0, 0);
-                    ctx.restore();
-                }
+                    img.onerror = reject;
+                });
             }
 
-            // Save the final image
-            const timestamp = new Date().getTime();
-            const dataUrl = canvas.toDataURL('image/png');
+            // Draw text layers with proper scaling
+            for (const textSet of textSets) {
+                ctx.save();
+                
+                // Calculate position relative to canvas size
+                const x = (textSet.position?.x || 50) / 100 * canvas.width;
+                const y = (textSet.position?.y || 50) / 100 * canvas.height;
+                
+                // Calculate font size relative to canvas size
+                const scaledFontSize = (textSet.fontSize / 1000) * Math.min(canvas.width, canvas.height);
+                
+                ctx.translate(x, y);
+                ctx.rotate((textSet.rotation * Math.PI) / 180);
+                ctx.globalAlpha = textSet.opacity;
+                
+                // Set scaled font
+                ctx.font = `${textSet.fontWeight} ${scaledFontSize}px ${textSet.fontFamily}`;
+                ctx.fillStyle = textSet.color;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                const lines = textSet.text.split('\n');
+                const lineHeight = scaledFontSize * 1.2;
+                
+                lines.forEach((line, index) => {
+                    const yOffset = (index - (lines.length - 1) / 2) * lineHeight;
+                    ctx.fillText(line, 0, yOffset);
+                });
+                
+                ctx.restore();
+            }
+
+            // Convert canvas to blob and download
+            const blob = await new Promise<Blob>((resolve) => {
+                canvas.toBlob((blob) => {
+                    if (blob) resolve(blob);
+                }, 'image/png');
+            });
+
+            const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            link.download = `imagecrafter-${resolution}-${timestamp}.png`;
-            link.href = dataUrl;
+            link.href = url;
+            link.download = `image-${Date.now()}.png`;
             link.click();
+            URL.revokeObjectURL(url);
 
         } catch (error) {
             console.error('Error saving image:', error);
         } finally {
             setIsProcessing(false);
+            setIsDialogOpen(false);
         }
     };
 
@@ -453,8 +439,8 @@ const Page = () => {
             ...prev,
             images: prev.images.map(layer => {
                 if (layer.id === layerId) {
-                    // Create new layer with updates
-                    const updatedLayer = {
+                    // Only update the specific layer that was edited
+                    return {
                         ...layer,
                         ...updates,
                         // Ensure position stays within bounds
@@ -463,23 +449,6 @@ const Page = () => {
                             y: Math.max(0, Math.min(100, updates.position?.y ?? layer.position.y))
                         }
                     };
-                    
-                    // If this is a parent layer, update child layers too
-                    const childLayers = prev.images.filter(l => l.parentId === layerId);
-                    childLayers.forEach(child => {
-                        const childIndex = prev.images.findIndex(l => l.id === child.id);
-                        if (childIndex !== -1) {
-                            prev.images[childIndex] = {
-                                ...child,
-                                position: updatedLayer.position,
-                                size: updatedLayer.size,
-                                rotation: updatedLayer.rotation,
-                                crop: updatedLayer.crop
-                            };
-                        }
-                    });
-
-                    return updatedLayer;
                 }
                 return layer;
             })
