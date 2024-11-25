@@ -58,6 +58,10 @@ interface ImageLayer {
     height: number;
     aspect?: number;
   };
+  originalDimensions: {
+    width: number;
+    height: number;
+  };
 }
 
 interface LayerState {
@@ -150,7 +154,7 @@ const Page = () => {
 
                 const newImageId = `image-${Date.now()}`;
                 
-                // Create layers with calculated dimensions
+                // Create layers with calculated dimensions and store original dimensions
                 const originalLayer: ImageLayer = {
                     id: newImageId,
                     type: 'original',
@@ -169,6 +173,10 @@ const Page = () => {
                         y: 0,
                         width: 100,
                         height: 100
+                    },
+                    originalDimensions: {
+                        width: img.width,
+                        height: img.height
                     }
                 };
 
@@ -410,12 +418,50 @@ const Page = () => {
     const handleImageUpdate = (layerId: string, updates: Partial<ImageLayer>) => {
         setLayers(prev => ({
             ...prev,
-            images: prev.images.map(layer => 
-                layer.id === layerId 
-                    ? { ...layer, ...updates }
-                    : layer
-            )
+            images: prev.images.map(layer => {
+                if (layer.id === layerId) {
+                    // Create new layer with updates
+                    const updatedLayer = {
+                        ...layer,
+                        ...updates,
+                        // Ensure position stays within bounds
+                        position: {
+                            x: Math.max(0, Math.min(100, updates.position?.x ?? layer.position.x)),
+                            y: Math.max(0, Math.min(100, updates.position?.y ?? layer.position.y))
+                        }
+                    };
+                    
+                    // If this is a parent layer, update child layers too
+                    const childLayers = prev.images.filter(l => l.parentId === layerId);
+                    childLayers.forEach(child => {
+                        const childIndex = prev.images.findIndex(l => l.id === child.id);
+                        if (childIndex !== -1) {
+                            prev.images[childIndex] = {
+                                ...child,
+                                position: updatedLayer.position,
+                                size: updatedLayer.size,
+                                rotation: updatedLayer.rotation,
+                                crop: updatedLayer.crop
+                            };
+                        }
+                    });
+
+                    return updatedLayer;
+                }
+                return layer;
+            })
         }));
+
+        // Force a re-render of the preview panel
+        requestAnimationFrame(() => {
+            const canvas = canvasRef.current;
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+        });
     };
 
     const handleLayerSelect = (layerId: string | null) => {

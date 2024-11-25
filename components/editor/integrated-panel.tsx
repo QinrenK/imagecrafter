@@ -124,6 +124,49 @@ export function IntegratedPanel({
     });
   };
 
+  const handleResetTransform = () => {
+    if (!selectedImage) return;
+    
+    // Get original dimensions from the layer
+    const originalDims = selectedImage.originalDimensions;
+    if (!originalDims) return;
+
+    // Calculate container dimensions (60% of viewport)
+    const containerWidth = window.innerWidth * 0.6;
+    const containerHeight = window.innerHeight * 0.6;
+    
+    // Calculate dimensions to fit container while maintaining aspect ratio
+    const aspectRatio = originalDims.width / originalDims.height;
+    let newWidth = containerWidth;
+    let newHeight = newWidth / aspectRatio;
+
+    if (newHeight > containerHeight) {
+        newHeight = containerHeight;
+        newWidth = newHeight * aspectRatio;
+    }
+
+    // Reset all transformations including crop
+    onImageUpdate(selectedImage.id, {
+        rotation: 0,
+        position: { x: 50, y: 50 },
+        size: {
+            width: Math.round(newWidth),
+            height: Math.round(newHeight)
+        },
+        crop: {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+            aspect: undefined
+        },
+        opacity: 1
+    });
+
+    // Reset crop mode to ensure preview updates correctly
+    setCropMode(null);
+  };
+
   return (
     <Card className="h-full p-4 overflow-hidden">
       <Tabs 
@@ -338,21 +381,17 @@ export function IntegratedPanel({
                 </div>
 
                 {/* Reset Transform */}
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => onImageUpdate(selectedImage.id, {
-                    rotation: 0,
-                    position: { x: 50, y: 50 },
-                    size: {
-                      width: Math.round(window.innerWidth * 0.4),
-                      height: Math.round(window.innerHeight * 0.4)
-                    }
-                  })}
-                >
-                  <ReloadIcon className="mr-2 h-4 w-4" />
-                  Reset Transform
-                </Button>
+                <div className="space-y-2">
+                  <Label>Reset</Label>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleResetTransform}
+                  >
+                    <ReloadIcon className="mr-2 h-4 w-4" />
+                    Reset Transform
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center p-8 space-y-4 border-2 border-dashed rounded-lg border-muted-foreground/25">

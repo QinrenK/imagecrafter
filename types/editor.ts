@@ -22,6 +22,10 @@ export interface ImageLayer {
     height: number;
     aspect?: number;
   };
+  originalDimensions?: {
+    width: number;
+    height: number;
+  };
 }
 
 export interface TextSet {
