@@ -193,115 +193,43 @@ export function IntegratedPanel({
   };
 
   return (
-    <Card className="h-full p-4 overflow-hidden">
-      <Tabs 
-        value={activeTab} 
-        onValueChange={setActiveTab}
-        className="w-full h-full flex flex-col"
-        data-integrated-panel
-        data-active-tab={activeTab}
-      >
-        <TabsList className="grid w-full grid-cols-2 mb-4">
-          <TabsTrigger 
-            value="transform"
-          >
-            Transform
-          </TabsTrigger>
-          <TabsTrigger 
-            value="text"
-          >
-            Text
-          </TabsTrigger>
+    <Card className="h-full flex flex-col">
+      <Tabs defaultValue="transform" value={activeTab} className="flex-1 flex flex-col">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="transform">Transform</TabsTrigger>
+          <TabsTrigger value="text">Text</TabsTrigger>
         </TabsList>
 
         <ScrollArea className="flex-1">
-          <TabsContent value="transform" className="space-y-4 mt-0">
-            {selectedImage ? (
-              <div className="space-y-4">
-                {/* Position Controls */}
-                <div className="space-y-2">
-                  <Label>Position</Label>
-                  <div className="grid grid-cols-3 gap-2 place-items-center">
-                    <div />
-                    <Button 
-                      variant={selectedTool === 'move-up' ? "default" : "outline"}
-                      size="icon" 
-                      onClick={() => {
-                        handleToolClick('move-up');
-                        handleMove('up');
-                      }}
-                    >
-                      <ArrowUpIcon className="h-4 w-4" />
-                    </Button>
-                    <div />
-                    <Button 
-                      variant={selectedTool === 'move-left' ? "default" : "outline"}
-                      size="icon" 
-                      onClick={() => {
-                        handleToolClick('move-left');
-                        handleMove('left');
-                      }}
-                    >
-                      <ArrowLeftIcon className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant={selectedTool === 'move-down' ? "default" : "outline"}
-                      size="icon" 
-                      onClick={() => {
-                        handleToolClick('move-down');
-                        handleMove('down');
-                      }}
-                    >
-                      <ArrowDownIcon className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant={selectedTool === 'move-right' ? "default" : "outline"}
-                      size="icon" 
-                      onClick={() => {
-                        handleToolClick('move-right');
-                        handleMove('right');
-                      }}
-                    >
-                      <ArrowRightIcon className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  {/* Position Input Fields */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">X Position (%)</Label>
-                      <Input
-                        type="number"
-                        value={Math.round(selectedImage.position.x)}
-                        min={0}
-                        max={100}
-                        onChange={(e) => {
-                          const x = Number(e.target.value);
-                          if (x >= 0 && x <= 100) {
-                            onImageUpdate(selectedImage.id, {
-                              position: { ...selectedImage.position, x }
-                            });
-                          }
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Y Position (%)</Label>
-                      <Input
-                        type="number"
-                        value={Math.round(selectedImage.position.y)}
-                        min={0}
-                        max={100}
-                        onChange={(e) => {
-                          const y = Number(e.target.value);
-                          if (y >= 0 && y <= 100) {
-                            onImageUpdate(selectedImage.id, {
-                              position: { ...selectedImage.position, y }
-                            });
-                          }
-                        }}
-                      />
-                    </div>
+          <TabsContent value="transform" className="space-y-6 mt-0 px-4">
+            {selectedImage && (
+              <div className="space-y-6">
+                {/* Position Controls - Simplified */}
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium">Position</Label>
+                  <div className="space-y-4">
+                    <SliderField
+                      attribute="position.x"
+                      label="X Position"
+                      min={0}
+                      max={100}
+                      step={1}
+                      currentValue={selectedImage.position.x}
+                      handleAttributeChange={(_, value) => onImageUpdate(selectedImage.id, { 
+                        position: { ...selectedImage.position, x: value } 
+                      })}
+                    />
+                    <SliderField
+                      attribute="position.y"
+                      label="Y Position"
+                      min={0}
+                      max={100}
+                      step={1}
+                      currentValue={selectedImage.position.y}
+                      handleAttributeChange={(_, value) => onImageUpdate(selectedImage.id, { 
+                        position: { ...selectedImage.position, y: value } 
+                      })}
+                    />
                   </div>
                 </div>
 
@@ -451,31 +379,6 @@ export function IntegratedPanel({
                     Reset Transform
                   </Button>
                 </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center p-8 space-y-4 border-2 border-dashed rounded-lg border-muted-foreground/25">
-                <div className="flex flex-col items-center text-center space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Select an image to transform it
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Or upload a new image to get started
-                  </p>
-                </div>
-                <input
-                  type="file"
-                  id="image-upload"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={onFileChange}
-                />
-                <Button 
-                  onClick={() => document.getElementById('image-upload')?.click()}
-                  className="w-fit"
-                >
-                  <PlusIcon className="mr-2 h-4 w-4" />
-                  Upload Image
-                </Button>
               </div>
             )}
           </TabsContent>
