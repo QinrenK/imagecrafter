@@ -240,6 +240,12 @@ const Page = () => {
             opacity: 1,
             rotation: 0
         }]);
+        
+        // Select the newly created text layer
+        setSelectedLayer(newId);
+        
+        // Add to layer history if not already using it
+        setLayerHistory(prev => [...prev, newId]);
     };
 
     const handleAttributeChange = (id: string, attribute: string, value: any) => {
