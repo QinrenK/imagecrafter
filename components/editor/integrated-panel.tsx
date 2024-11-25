@@ -307,11 +307,21 @@ export function IntegratedPanel({
                 <div className="space-y-2">
                   <Label>Rotation</Label>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="icon" onClick={() => handleRotate('left')}>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={() => handleRotate('left')}
+                      title="Rotate Left"
+                    >
                       <RotateCounterClockwiseIcon className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="icon" onClick={() => handleRotate('right')}>
-                      <ReloadIcon className="h-4 w-4 transform scale-x-[-1]" />
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={() => handleRotate('right')}
+                      title="Rotate Right"
+                    >
+                      <RotateCounterClockwiseIcon className="h-4 w-4 transform scale-x-[-1]" />
                     </Button>
                     <Input
                       type="number"
