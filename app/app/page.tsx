@@ -993,7 +993,7 @@ const Page = () => {
                 height={canvasDimensions.height}
             />
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent>
+                <DialogContent className="z-[10001]">
                     <DialogHeader>
                         <DialogTitle>Select Resolution</DialogTitle>
                     </DialogHeader>
