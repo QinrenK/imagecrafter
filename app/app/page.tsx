@@ -284,8 +284,21 @@ const Page = () => {
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
 
+            // Get target dimensions based on selected resolution
+            const targetDimensions = getResolutionDimensions(resolution);
+            
+            // Set canvas size to match target resolution
+            canvas.width = targetDimensions.width;
+            canvas.height = targetDimensions.height;
+
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#000000'; // Set background color
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Calculate scale factors for the new resolution
+            const scaleX = targetDimensions.width / canvasDimensions.width;
+            const scaleY = targetDimensions.height / canvasDimensions.height;
 
             // Sort layers by z-index
             const allLayers = [...layers.images, ...textSets.map(text => ({
@@ -306,10 +319,11 @@ const Page = () => {
                     
                     await new Promise<void>((resolve) => {
                         img.onload = () => {
-                            // Calculate dimensions that maintain aspect ratio
-                            const originalAspectRatio = img.naturalWidth / img.naturalHeight;
-                            const targetWidth = layer.size.width;
-                            const targetHeight = targetWidth / originalAspectRatio;
+                            // Scale dimensions and positions
+                            const scaledWidth = layer.size.width * scaleX;
+                            const scaledHeight = layer.size.height * scaleY;
+                            const scaledX = (layer.position.x / 100) * targetDimensions.width;
+                            const scaledY = (layer.position.y / 100) * targetDimensions.height;
 
                             // Create temporary canvas for cropping
                             const tempCanvas = document.createElement('canvas');
@@ -319,18 +333,18 @@ const Page = () => {
                                 return;
                             }
 
-                            // Set temp canvas size to match original image aspect ratio
-                            tempCanvas.width = targetWidth;
-                            tempCanvas.height = targetHeight;
+                            // Set temp canvas size
+                            tempCanvas.width = scaledWidth;
+                            tempCanvas.height = scaledHeight;
 
                             // Draw image maintaining aspect ratio
-                            tempCtx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                            tempCtx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
 
                             // Apply crop if needed
-                            const cropX = (layer.crop.x / 100) * targetWidth;
-                            const cropY = (layer.crop.y / 100) * targetHeight;
-                            const cropWidth = (layer.crop.width / 100) * targetWidth;
-                            const cropHeight = (layer.crop.height / 100) * targetHeight;
+                            const cropX = (layer.crop.x / 100) * scaledWidth;
+                            const cropY = (layer.crop.y / 100) * scaledHeight;
+                            const cropWidth = (layer.crop.width / 100) * scaledWidth;
+                            const cropHeight = (layer.crop.height / 100) * scaledHeight;
 
                             // Create another temp canvas for the cropped result
                             const croppedCanvas = document.createElement('canvas');
@@ -350,14 +364,10 @@ const Page = () => {
                                 0, 0, cropWidth, cropHeight
                             );
 
-                            // Calculate position in main canvas
-                            const x = (layer.position.x / 100) * canvas.width;
-                            const y = (layer.position.y / 100) * canvas.height;
-
                             // Draw to main canvas with rotation and opacity
                             ctx.save();
                             ctx.globalAlpha = layer.opacity;
-                            ctx.translate(x, y);
+                            ctx.translate(scaledX, scaledY);
                             ctx.rotate((layer.rotation * Math.PI) / 180);
                             ctx.drawImage(
                                 croppedCanvas,
@@ -374,8 +384,24 @@ const Page = () => {
                             resolve();
                         };
                     });
+                } else if (!('imageUrl' in layer)) {
+                    // Handle text layers
+                    const textLayer = layer as TextSet;
+                    const scaledX = (textLayer.position.x / 100) * targetDimensions.width;
+                    const scaledY = (textLayer.position.y / 100) * targetDimensions.height;
+                    const scaledFontSize = textLayer.fontSize * scaleX;
+
+                    ctx.save();
+                    ctx.globalAlpha = textLayer.opacity;
+                    ctx.translate(scaledX, scaledY);
+                    ctx.rotate((textLayer.rotation * Math.PI) / 180);
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = textLayer.color;
+                    ctx.font = `${textLayer.fontWeight} ${scaledFontSize}px ${textLayer.fontFamily}`;
+                    ctx.fillText(textLayer.text, 0, 0);
+                    ctx.restore();
                 }
-                // ... rest of the text rendering code ...
             }
 
             // Save the final image
