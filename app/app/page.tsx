@@ -71,6 +71,7 @@ interface LayerState {
 
 interface IntegratedPanelProps {
   selectedLayer: string | null;
+  setSelectedLayer: (layerId: string | null) => void;
   layers: {
     images: ImageLayer[];
     texts: TextSet[];
@@ -1031,6 +1032,7 @@ const Page = () => {
                             )}>
                                 <IntegratedPanel
                                     selectedLayer={selectedLayer}
+                                    setSelectedLayer={setSelectedLayer}
                                     layers={{
                                         images: layers.images,
                                         texts: textSets

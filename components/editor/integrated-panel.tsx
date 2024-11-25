@@ -30,6 +30,7 @@ import InputField from './input-field';
 
 interface IntegratedPanelProps {
   selectedLayer: string | null;
+  setSelectedLayer: (layerId: string | null) => void;
   layers: {
     images: ImageLayer[];
     texts: TextSet[];
@@ -44,6 +45,7 @@ interface IntegratedPanelProps {
 
 export function IntegratedPanel({
   selectedLayer,
+  setSelectedLayer,
   layers,
   onImageUpdate,
   onTextUpdate,
@@ -192,9 +194,32 @@ export function IntegratedPanel({
     }
   };
 
+  // Add manual tab change handler
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    
+    if (value === "transform") {
+      // If switching to transform tab, select the most recently added image layer
+      const lastImageLayer = layers.images[layers.images.length - 1];
+      if (lastImageLayer) {
+        setSelectedLayer(lastImageLayer.id);
+      }
+    } else if (value === "text") {
+      // If switching to text tab and no text is selected, clear selection
+      if (!selectedText) {
+        setSelectedLayer(null);
+      }
+    }
+  };
+
   return (
     <Card className="h-full flex flex-col">
-      <Tabs defaultValue="transform" value={activeTab} className="flex-1 flex flex-col">
+      <Tabs 
+        defaultValue="transform" 
+        value={activeTab} 
+        onValueChange={handleTabChange}
+        className="flex-1 flex flex-col"
+      >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="transform">Transform</TabsTrigger>
           <TabsTrigger value="text">Text</TabsTrigger>
@@ -383,122 +408,122 @@ export function IntegratedPanel({
             )}
           </TabsContent>
 
-          <TabsContent value="text" className="space-y-4 mt-0">
+          <TabsContent value="text" className="space-y-6 mt-0 px-4">
             {selectedText ? (
-              <div className="space-y-4">
-                <InputField
-                  attribute="text"
-                  label="Text"
-                  currentValue={selectedText.text}
-                  handleAttributeChange={(attribute, value) => {
-                    const processedValue = value.replace(/\r\n/g, '\n');
-                    onTextUpdate(selectedText.id, { [attribute]: processedValue });
-                  }}
-                  multiline
-                />
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <InputField
+                    attribute="text"
+                    label="Text Content"
+                    currentValue={selectedText.text}
+                    handleAttributeChange={(attribute, value) => {
+                      const processedValue = value.replace(/\r\n/g, '\n');
+                      onTextUpdate(selectedText.id, { [attribute]: processedValue });
+                    }}
+                    multiline
+                  />
 
-                <FontFamilyPicker
-                  attribute="fontFamily"
-                  currentFont={selectedText.fontFamily}
-                  handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
-                />
+                  <FontFamilyPicker
+                    attribute="fontFamily"
+                    currentFont={selectedText.fontFamily}
+                    handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
+                  />
 
-                <ColorPicker
-                  attribute="color"
-                  label="Text Color"
-                  currentColor={selectedText.color}
-                  handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
-                />
-
-                <SliderField
-                  attribute="position.x"
-                  label="X Position"
-                  min={0}
-                  max={100}
-                  step={1}
-                  currentValue={selectedText.position?.x || 50}
-                  handleAttributeChange={(_, value) => onTextUpdate(selectedText.id, { 
-                    position: { ...selectedText.position, x: value } 
-                  })}
-                />
-
-                <SliderField
-                  attribute="position.y"
-                  label="Y Position"
-                  min={0}
-                  max={100}
-                  step={1}
-                  currentValue={selectedText.position?.y || 50}
-                  handleAttributeChange={(_, value) => onTextUpdate(selectedText.id, { 
-                    position: { ...selectedText.position, y: value } 
-                  })}
-                />
-
-                <SliderField
-                  attribute="fontSize"
-                  label="Text Size"
-                  min={10}
-                  max={800}
-                  step={1}
-                  currentValue={selectedText.fontSize}
-                  handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
-                />
-
-                <SliderField
-                  attribute="fontWeight"
-                  label="Font Weight"
-                  min={100}
-                  max={900}
-                  step={100}
-                  currentValue={selectedText.fontWeight}
-                  handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
-                />
-
-                <SliderField
-                  attribute="opacity"
-                  label="Text Opacity"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  currentValue={selectedText.opacity}
-                  handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
-                />
-
-                <SliderField
-                  attribute="rotation"
-                  label="Rotation"
-                  min={-360}
-                  max={360}
-                  step={1}
-                  currentValue={selectedText.rotation}
-                  handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
-                />
-
-                <div className="flex flex-row gap-2 my-4">
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={onAddText}
-                  >
-                    <FontFamilyIcon className="mr-2 h-4 w-4" />
-                    Add New Text
-                  </Button>
+                  <ColorPicker
+                    attribute="color"
+                    label="Text Color"
+                    currentColor={selectedText.color}
+                    handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
+                  />
                 </div>
+
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium">Position & Size</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <SliderField
+                      attribute="position.x"
+                      label="X Position"
+                      min={0}
+                      max={100}
+                      step={1}
+                      currentValue={selectedText.position?.x || 50}
+                      handleAttributeChange={(_, value) => onTextUpdate(selectedText.id, { 
+                        position: { ...selectedText.position, x: value } 
+                      })}
+                    />
+                    <SliderField
+                      attribute="position.y"
+                      label="Y Position"
+                      min={0}
+                      max={100}
+                      step={1}
+                      currentValue={selectedText.position?.y || 50}
+                      handleAttributeChange={(_, value) => onTextUpdate(selectedText.id, { 
+                        position: { ...selectedText.position, y: value } 
+                      })}
+                    />
+                  </div>
+                  <SliderField
+                    attribute="fontSize"
+                    label="Text Size"
+                    min={10}
+                    max={800}
+                    step={1}
+                    currentValue={selectedText.fontSize}
+                    handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium">Style</Label>
+                  <SliderField
+                    attribute="fontWeight"
+                    label="Font Weight"
+                    min={100}
+                    max={900}
+                    step={100}
+                    currentValue={selectedText.fontWeight}
+                    handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
+                  />
+                  <SliderField
+                    attribute="opacity"
+                    label="Opacity"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    currentValue={selectedText.opacity}
+                    handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
+                  />
+                  <SliderField
+                    attribute="rotation"
+                    label="Rotation"
+                    min={-360}
+                    max={360}
+                    step={1}
+                    currentValue={selectedText.rotation}
+                    handleAttributeChange={(attribute, value) => onTextUpdate(selectedText.id, { [attribute]: value })}
+                  />
+                </div>
+
+                <Button 
+                  variant="outline" 
+                  className="w-full h-10"
+                  onClick={onAddText}
+                >
+                  <FontFamilyIcon className="mr-2 h-4 w-4" />
+                  Add New Text
+                </Button>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center p-8 space-y-4 border-2 border-dashed rounded-lg border-muted-foreground/25">
                 <FontFamilyIcon className="h-8 w-8 mb-4 text-muted-foreground" />
                 <div className="flex flex-col items-center text-center space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Add text to your design
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Click below to add a new text layer
-                  </p>
+                  <p className="text-sm text-muted-foreground">Add text to your design</p>
+                  <p className="text-xs text-muted-foreground">Click below to add a new text layer</p>
                 </div>
                 <Button 
                   onClick={onAddText}
-                  className="w-fit"
+                  className="w-fit h-10"
                 >
                   <FontFamilyIcon className="mr-2 h-4 w-4" />
                   Add New Text
